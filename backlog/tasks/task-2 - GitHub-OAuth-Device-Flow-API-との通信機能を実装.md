@@ -1,9 +1,10 @@
 ---
 id: task-2
 title: GitHub OAuth Device Flow API との通信機能を実装
-status: To Do
+status: Done
 assignee: []
 created_date: '2025-10-31 11:23'
+updated_date: '2025-10-31 12:42'
 labels:
   - auth
   - api
