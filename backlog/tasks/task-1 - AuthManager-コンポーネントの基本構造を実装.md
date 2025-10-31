@@ -1,7 +1,7 @@
 ---
 id: task-1
 title: AuthManager コンポーネントの基本構造を実装
-status: To Do
+status: Done
 assignee: []
 created_date: '2025-10-31 11:23'
 labels:
