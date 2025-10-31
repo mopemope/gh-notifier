@@ -1,30 +1,29 @@
-#
+# Repository Guidelines
 
-<!-- BACKLOG.MD MCP GUIDELINES START -->
+## プロジェクト構造とモジュール編成
+- ルート直下の `Cargo.toml` がクレート設定、`rustfmt.toml` がフォーマッタ設定です。
+- 実装は `src/main.rs` に集約されています。モジュールを追加する場合は `src/` 配下に Rust ファイルを増やし、`mod` 宣言で構造化してください。
+- 統合テストは `tests/` ディレクトリに Rust ファイルを置くと自動検出されます。現状は未作成なので新規作成から始めてください。
+- ドキュメントや運用関連の補助資料は `backlog/` にあり、作業フローの参照に利用できます。
 
-<CRITICAL_INSTRUCTION>
+## ビルド・テスト・開発コマンド
+- `cargo build` : デバッグビルド。初回は依存関係のダウンロードを伴います。
+- `cargo run` : バイナリをビルドし、GitHub OAuth デバイスフローの対話を含むデーモンを起動します。
+- `cargo build --release` : 本番利用向けの最適化バイナリを `target/release/gh-notifier` に生成します。
+- `cargo fmt` : `rustfmt.toml` に従ってソースを整形します。PR 前に実行してください。
 
-## BACKLOG WORKFLOW INSTRUCTIONS
+## コーディングスタイルと命名規則
+- Rust 2024 Edition を前提に 4 スペースインデントを徹底し、`cargo fmt` の結果を正とします。
+- モジュール名・ファイル名は `snake_case`、構造体・列挙型は `PascalCase`、関数・変数は `snake_case` を推奨します。
+- ログには `tracing` ベースの構造化ログを想定し、フィールド名は短く意味の分かる英語に揃えてください。
 
-This project uses Backlog.md MCP for all task and project management activities.
+## テストガイドライン
+- `cargo test` でユニットテスト・統合テストを一括実行できます。CI 導入前でもローカルでの実行を必須としてください。
+- ユニットテストは対象モジュール末尾の `#[cfg(test)] mod tests` に、統合テストは `tests/` 配下に `*_test.rs` 形式で配置します。
+- 非同期処理など時間依存のケースは `tokio::test` など適切な属性を付与し、遅延やリトライ条件を最小化してください。
 
-**CRITICAL GUIDANCE**
-
-- If your client supports MCP resources, read `backlog://workflow/overview` to understand when and how to use Backlog for this project.
-- If your client only supports tools or the above request fails, call `backlog.get_workflow_overview()` tool to load the tool-oriented overview (it lists the matching guide tools).
-
-- **First time working here?** Read the overview resource IMMEDIATELY to learn the workflow
-- **Already familiar?** You should have the overview cached ("## Backlog.md Overview (MCP)")
-- **When to read it**: BEFORE creating tasks, or when you're unsure whether to track work
-
-These guides cover:
-- Decision framework for when to create tasks
-- Search-first workflow to avoid duplicates
-- Links to detailed guides for task creation, execution, and completion
-- MCP tools reference
-
-You MUST read the overview resource to understand the complete workflow. The information is NOT summarized here.
-
-</CRITICAL_INSTRUCTION>
-
-<!-- BACKLOG.MD MCP GUIDELINES END -->
+## コミットとプルリクエスト
+- Git 履歴は `feat: ...` や `docs: ...` のような Conventional Commits を採用しています。同形式で簡潔に概要を記述してください。
+- コミットは論理的な単位で分割し、フォーマット・リファクタリングと機能改修は別コミットに分けます。
+- プルリクエストは目的、主要変更点、テスト結果（実行コマンドと要約）を本文に含め、関連 Issue があればリンクします。UI 変更や通知挙動の差分はスクリーンショットやログ抜粋を添付してください。
+- セキュリティ関連の設定値やアクセストークンはソースに含めず、開発メモにはマスキングして記載します。
