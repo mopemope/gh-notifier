@@ -1,4 +1,4 @@
-use crate::{AuthError, DeviceAuthResponse, TokenResponse, ErrorResponse, TokenInfo};
+use crate::{AuthError, DeviceAuthResponse, ErrorResponse, TokenInfo, TokenResponse};
 use keyring::Entry;
 use secrecy::{ExposeSecret, SecretString};
 use std::sync::Arc;
@@ -92,7 +92,10 @@ impl AuthManager {
                     }
                     "slow_down" => {
                         // GitHub is asking us to slow down, increase the interval by 5 seconds
-                        tokio::time::sleep(tokio::time::Duration::from_secs(device_response.interval + 5)).await;
+                        tokio::time::sleep(tokio::time::Duration::from_secs(
+                            device_response.interval + 5,
+                        ))
+                        .await;
                         continue;
                     }
                     "expired_token" => {
@@ -119,38 +122,43 @@ impl AuthManager {
                 let token_data: TokenResponse = serde_json::from_str(&response_text)?;
 
                 // Success! We got the token
-                let expires_at = token_data.expires_in.map(|expires_in| {
-                    std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .unwrap()
-                        .as_secs()
-                        + expires_in
-                }).or_else(|| {
-                    // Default expiration time (GitHub tokens typically expire in 1 hour by default)
-                    Some(
+                let expires_at = token_data
+                    .expires_in
+                    .map(|expires_in| {
                         std::time::SystemTime::now()
                             .duration_since(std::time::UNIX_EPOCH)
                             .unwrap()
                             .as_secs()
-                            + 3600, // 1 hour in seconds
-                    )
-                });
+                            + expires_in
+                    })
+                    .or_else(|| {
+                        // Default expiration time (GitHub tokens typically expire in 1 hour by default)
+                        Some(
+                            std::time::SystemTime::now()
+                                .duration_since(std::time::UNIX_EPOCH)
+                                .unwrap()
+                                .as_secs()
+                                + 3600, // 1 hour in seconds
+                        )
+                    });
 
-                let refresh_token = token_data.refresh_token
-                    .map(|s| SecretString::new(s));
-                let refresh_expires_at = token_data.refresh_token_expires_in.map(|expires_in| {
-                    std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .unwrap()
-                        .as_secs()
-                        + expires_in
-                }).or_else(|| {
-                    // Default refresh token expiration to 6 months if not provided
-                    std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .ok()
-                        .map(|dur| dur.as_secs() + (6 * 30 * 24 * 3600)) // 6 months
-                });
+                let refresh_token = token_data.refresh_token.map(SecretString::new);
+                let refresh_expires_at = token_data
+                    .refresh_token_expires_in
+                    .map(|expires_in| {
+                        std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap()
+                            .as_secs()
+                            + expires_in
+                    })
+                    .or_else(|| {
+                        // Default refresh token expiration to 6 months if not provided
+                        std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .ok()
+                            .map(|dur| dur.as_secs() + (6 * 30 * 24 * 3600)) // 6 months
+                    });
 
                 let token_info = TokenInfo {
                     access_token: SecretString::new(token_data.access_token),
@@ -166,22 +174,26 @@ impl AuthManager {
                 return Ok(token_info);
             } else {
                 // Unexpected response type
-                return Err(AuthError::GeneralError(format!("Unexpected response from token endpoint: {}", response_text)));
+                return Err(AuthError::GeneralError(format!(
+                    "Unexpected response from token endpoint: {}",
+                    response_text
+                )));
             }
         }
     }
 
     /// Refreshes the access token if it has expired
     pub async fn refresh_token(&mut self) -> Result<TokenInfo, AuthError> {
-        let current_token = self
-            .token_info
-            .as_ref()
-            .ok_or(AuthError::GeneralError("No token available to refresh".to_string()))?;
+        let current_token = self.token_info.as_ref().ok_or(AuthError::GeneralError(
+            "No token available to refresh".to_string(),
+        ))?;
 
         let refresh_token = current_token
             .refresh_token
             .as_ref()
-            .ok_or(AuthError::GeneralError("No refresh token available".to_string()))?;
+            .ok_or(AuthError::GeneralError(
+                "No refresh token available".to_string(),
+            ))?;
 
         let client = reqwest::Client::new();
         let params = [
@@ -193,7 +205,8 @@ impl AuthManager {
         let response = client.post(GITHUB_TOKEN_URL).form(&params).send().await?;
 
         let response_text = response.text().await?;
-        let token_result: Result<TokenResponse, serde_json::Error> = serde_json::from_str(&response_text);
+        let token_result: Result<TokenResponse, serde_json::Error> =
+            serde_json::from_str(&response_text);
 
         if let Ok(token_data) = token_result {
             // Success case
@@ -207,17 +220,21 @@ impl AuthManager {
             );
 
             // The refresh token might be the same or a new one, depending on the provider
-            let new_refresh_token = token_data.refresh_token
-                .map(|s| SecretString::new(s))
+            let new_refresh_token = token_data
+                .refresh_token
+                .map(SecretString::new)
                 .unwrap_or_else(|| refresh_token.clone());
 
-            let refresh_expires_at = token_data.refresh_token_expires_in.map(|expires_in| {
-                std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
-                    .as_secs()
-                    + expires_in
-            }).or(current_token.refresh_token_expires_at);
+            let refresh_expires_at = token_data
+                .refresh_token_expires_in
+                .map(|expires_in| {
+                    std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap()
+                        .as_secs()
+                        + expires_in
+                })
+                .or(current_token.refresh_token_expires_at);
 
             let token_info = TokenInfo {
                 access_token: SecretString::new(token_data.access_token),
@@ -239,15 +256,16 @@ impl AuthManager {
                     description: error_response.error_description,
                 })
             } else {
-                Err(AuthError::GeneralError(format!("Token refresh failed with response: {}", response_text)))
+                Err(AuthError::GeneralError(format!(
+                    "Token refresh failed with response: {}",
+                    response_text
+                )))
             }
         }
     }
 
     /// Loads the token from the OS keychain
-    pub fn load_token_from_keychain(
-        &mut self,
-    ) -> Result<Option<TokenInfo>, AuthError> {
+    pub fn load_token_from_keychain(&mut self) -> Result<Option<TokenInfo>, AuthError> {
         if let Some(ref entry) = self.keychain_entry {
             match entry.get_password() {
                 Ok(token_json) => {
@@ -267,16 +285,74 @@ impl AuthManager {
     }
 
     /// Saves the token to the OS keychain
-    pub fn save_token_to_keychain(
-        &self,
-        token_info: &TokenInfo,
-    ) -> Result<(), AuthError> {
+    pub fn save_token_to_keychain(&self, token_info: &TokenInfo) -> Result<(), AuthError> {
         if let Some(ref entry) = self.keychain_entry {
             let token_json = serde_json::to_string(token_info)?;
             entry.set_password(&token_json)?;
             Ok(())
         } else {
-            Err(AuthError::GeneralError("Keychain entry not initialized".to_string()))
+            Err(AuthError::GeneralError(
+                "Keychain entry not initialized".to_string(),
+            ))
         }
+    }
+
+    /// Deletes the token from the OS keychain
+    pub fn delete_token_from_keychain(&mut self) -> Result<(), AuthError> {
+        if let Some(ref entry) = self.keychain_entry {
+            match entry.delete_password() {
+                Ok(()) => {
+                    // Clear the in-memory token info as well
+                    self.token_info = None;
+                    Ok(())
+                }
+                Err(keyring::Error::NoEntry) => {
+                    // If the item doesn't exist, that's not really an error from the user's perspective
+                    // Still clear the in-memory token info if it exists
+                    self.token_info = None;
+                    Ok(())
+                }
+                Err(e) => Err(AuthError::KeyringError(e)),
+            }
+        } else {
+            Err(AuthError::GeneralError(
+                "Keychain entry not initialized".to_string(),
+            ))
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use secrecy::SecretString;
+
+    #[test]
+    fn test_auth_manager_creation() {
+        // Note: This test will fail when keyring isn't available in test environment
+        // We'll skip this test in environments where keyring is not available
+        if let Ok(auth_manager) = AuthManager::new() {
+            assert_eq!(auth_manager.client_id, GITHUB_OAUTH_CLIENT_ID);
+            assert!(auth_manager.token_info.is_none());
+        }
+    }
+
+    #[test]
+    fn test_token_serialization() {
+        // This is a pure serialization test that doesn't depend on keyring
+        let token = TokenInfo {
+            access_token: SecretString::new("test_token".to_string()),
+            token_type: "Bearer".to_string(),
+            expires_at: Some(1234567890),
+            refresh_token: Some(SecretString::new("refresh_token".to_string())),
+            refresh_token_expires_at: Some(1234567890),
+        };
+
+        let serialized = serde_json::to_string(&token).expect("Failed to serialize TokenInfo");
+        let deserialized: TokenInfo =
+            serde_json::from_str(&serialized).expect("Failed to deserialize TokenInfo");
+
+        assert_eq!(deserialized.token_type, "Bearer");
+        assert_eq!(deserialized.expires_at, Some(1234567890));
     }
 }

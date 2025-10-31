@@ -15,7 +15,10 @@ pub enum AuthError {
     /// Timeout while waiting for user authorization
     AuthorizationTimeout,
     /// OAuth protocol error with specific error code
-    OAuthError { code: String, description: Option<String> },
+    OAuthError {
+        code: String,
+        description: Option<String>,
+    },
     /// General authentication error
     GeneralError(String),
 }
@@ -27,10 +30,17 @@ impl std::fmt::Display for AuthError {
             AuthError::JsonError(e) => write!(f, "JSON error: {}", e),
             AuthError::KeyringError(e) => write!(f, "Keyring error: {}", e),
             AuthError::DeviceCodeExpired => write!(f, "Device code has expired"),
-            AuthError::AuthorizationCancelled => write!(f, "Authorization was cancelled by the user"),
+            AuthError::AuthorizationCancelled => {
+                write!(f, "Authorization was cancelled by the user")
+            }
             AuthError::AuthorizationTimeout => write!(f, "Authorization timed out"),
             AuthError::OAuthError { code, description } => {
-                write!(f, "OAuth error: {} - {}", code, description.as_deref().unwrap_or("no description"))
+                write!(
+                    f,
+                    "OAuth error: {} - {}",
+                    code,
+                    description.as_deref().unwrap_or("no description")
+                )
             }
             AuthError::GeneralError(msg) => write!(f, "Authentication error: {}", msg),
         }

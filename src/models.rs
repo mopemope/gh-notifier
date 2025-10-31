@@ -61,17 +61,17 @@ pub struct DeviceAuthResponse {
     pub device_code: String,
     pub user_code: String,
     pub verification_uri: String,
-    pub expires_in: u64,  // How long until the device code expires (in seconds)
-    pub interval: u64,    // Polling interval (in seconds)
+    pub expires_in: u64, // How long until the device code expires (in seconds)
+    pub interval: u64,   // Polling interval (in seconds)
 }
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct TokenResponse {
     pub access_token: String,
     pub token_type: String,
-    pub expires_in: Option<u64>,  // Optional field for access token expiry
+    pub expires_in: Option<u64>, // Optional field for access token expiry
     pub refresh_token: Option<String>,
-    pub refresh_token_expires_in: Option<u64>,  // Optional field for refresh token expiry
+    pub refresh_token_expires_in: Option<u64>, // Optional field for refresh token expiry
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -84,8 +84,8 @@ pub struct ErrorResponse {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::{SystemTime, UNIX_EPOCH};
     use secrecy::SecretString;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
     fn test_token_info_serialization() {
@@ -197,7 +197,10 @@ mod tests {
         assert_eq!(response.access_token, "gho_test_token");
         assert_eq!(response.token_type, "bearer");
         assert_eq!(response.expires_in, Some(3600));
-        assert_eq!(response.refresh_token, Some("ghr_test_refresh_token".to_string()));
+        assert_eq!(
+            response.refresh_token,
+            Some("ghr_test_refresh_token".to_string())
+        );
         assert_eq!(response.refresh_token_expires_in, Some(15768000));
     }
 
@@ -212,6 +215,9 @@ mod tests {
 
         let response: ErrorResponse = serde_json::from_str(json_response).unwrap();
         assert_eq!(response.error, "authorization_pending");
-        assert_eq!(response.error_description, Some("Authorization pending".to_string()));
+        assert_eq!(
+            response.error_description,
+            Some("Authorization pending".to_string())
+        );
     }
 }

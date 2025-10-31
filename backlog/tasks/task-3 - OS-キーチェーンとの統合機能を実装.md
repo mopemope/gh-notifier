@@ -1,9 +1,10 @@
 ---
 id: task-3
 title: OS キーチェーンとの統合機能を実装
-status: To Do
+status: Done
 assignee: []
 created_date: '2025-10-31 11:23'
+updated_date: '2025-10-31 14:07'
 labels:
   - auth
   - security
