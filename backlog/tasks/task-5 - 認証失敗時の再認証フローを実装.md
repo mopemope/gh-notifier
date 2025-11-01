@@ -1,9 +1,10 @@
 ---
 id: task-5
 title: 認証失敗時の再認証フローを実装
-status: To Do
+status: Done
 assignee: []
 created_date: '2025-10-31 11:24'
+updated_date: '2025-11-01 01:43'
 labels:
   - auth
   - error-handling

@@ -466,6 +466,121 @@ impl AuthManager {
         
         Ok(token_info)
     }
+
+    /// Validates the current token by making a request to GitHub's API
+    /// This is useful to determine if a token is actually valid or if re-auth is needed
+    pub async fn validate_token(&self) -> Result<bool, AuthError> {
+        if let Some(ref token_info) = self.token_info {
+            let client = reqwest::Client::new();
+            let response = client
+                .get("https://api.github.com/user")
+                .header("Authorization", format!("token {}", token_info.access_token.expose_secret()))
+                .send()
+                .await?;
+
+            // If we get a 200 OK, the token is valid
+            Ok(response.status().is_success())
+        } else {
+            // No token to validate
+            Ok(false)
+        }
+    }
+
+    /// Performs a complete re-authentication flow with user notifications
+    /// This method is designed to be called when any authentication failure occurs
+    pub async fn perform_reauthentication_with_notification(&mut self) -> Result<TokenInfo, AuthError> {
+        println!("Authentication token is invalid or has expired.");
+        println!("Starting re-authentication process...");
+        
+        match self.initiate_reauthentication().await {
+            Ok(token_info) => {
+                println!("Re-authentication completed successfully!");
+                println!("Your access token has been renewed.");
+                Ok(token_info)
+            }
+            Err(e) => {
+                eprintln!("Re-authentication failed: {}", e);
+                Err(e)
+            }
+        }
+    }
+
+    /// Gets a valid token, with automatic re-authentication if needed
+    /// This method combines token validation, refresh, and re-authentication
+    pub async fn get_valid_token_with_reauth(&mut self) -> Result<String, AuthError> {
+        // First, check if we have any token
+        if self.token_info.is_none() {
+            println!("No authentication token found. Starting authentication process...");
+            return match self.authenticate().await {
+                Ok(token_info) => {
+                    self.token_info = Some(token_info.clone());
+                    Ok(token_info.access_token.expose_secret().clone())
+                }
+                Err(e) => Err(e),
+            };
+        }
+
+        // Check if token needs refresh (will expire soon)
+        if self.is_access_token_expiring_soon(300) {
+            println!("Token is expiring soon, attempting refresh...");
+            match self.maybe_refresh_token().await {
+                Ok(token_info) => {
+                    self.token_info = Some(token_info.clone());
+                    Ok(token_info.access_token.expose_secret().clone())
+                }
+                Err(refresh_error) => {
+                    println!("Token refresh failed: {:?}. Initiating re-authentication...", refresh_error);
+                    match self.perform_reauthentication_with_notification().await {
+                        Ok(token_info) => {
+                            self.token_info = Some(token_info.clone());
+                            Ok(token_info.access_token.expose_secret().clone())
+                        }
+                        Err(e) => Err(e),
+                    }
+                }
+            }
+        } else {
+            // Token is not expiring soon, but let's make sure it's still valid
+            // This is an extra validation step for cases where token state might have changed externally
+            match self.validate_token().await {
+                Ok(true) => {
+                    // Token is valid
+                    Ok(self.token_info.as_ref().unwrap().access_token.expose_secret().clone())
+                }
+                Ok(false) => {
+                    // Token is invalid, we need to re-authenticate
+                    println!("Token validation failed. Initiating re-authentication...");
+                    match self.perform_reauthentication_with_notification().await {
+                        Ok(token_info) => {
+                            self.token_info = Some(token_info.clone());
+                            Ok(token_info.access_token.expose_secret().clone())
+                        }
+                        Err(e) => Err(e),
+                    }
+                }
+                Err(validation_error) => {
+                    // Validation failed due to network or other issues, try refresh first
+                    println!("Token validation failed: {:?}. Attempting refresh...", validation_error);
+                    match self.maybe_refresh_token().await {
+                        Ok(token_info) => {
+                            self.token_info = Some(token_info.clone());
+                            Ok(token_info.access_token.expose_secret().clone())
+                        }
+                        Err(refresh_error) => {
+                            println!("Token refresh failed: {:?}. Initiating re-authentication...", refresh_error);
+                            match self.perform_reauthentication_with_notification().await {
+                                Ok(token_info) => {
+                                    self.token_info = Some(token_info.clone());
+                                    Ok(token_info.access_token.expose_secret().clone())
+                                }
+                                Err(e) => Err(e),
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -648,5 +763,141 @@ mod tests {
         
         // But it should not be considered expired (since it has no expiration)
         assert!(!auth_manager_with_token.is_access_token_expired());
+    }
+
+    #[test]
+    fn test_token_validation_methods() {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        // Test is_access_token_expired with no token
+        let auth_manager_no_token = AuthManager {
+            client_id: GITHUB_OAUTH_CLIENT_ID.to_string(),
+            token_info: None,
+            keychain_entry: None,
+        };
+
+        assert!(auth_manager_no_token.is_access_token_expired());
+        assert!(auth_manager_no_token.is_access_token_expiring_soon(0));
+
+        // Test with expired token
+        let expired_token = TokenInfo {
+            access_token: SecretString::new("expired_token".to_string()),
+            token_type: "Bearer".to_string(),
+            expires_at: Some(now - 100), // Expired 100 seconds ago
+            refresh_token: Some(SecretString::new("refresh_token".to_string())),
+            refresh_token_expires_at: Some(now + 1000), // Valid refresh token
+        };
+
+        let auth_manager_expired = AuthManager {
+            client_id: GITHUB_OAUTH_CLIENT_ID.to_string(),
+            token_info: Some(expired_token),
+            keychain_entry: None,
+        };
+
+        assert!(auth_manager_expired.is_access_token_expired());
+        assert!(auth_manager_expired.is_access_token_expiring_soon(0));
+        assert!(auth_manager_expired.is_access_token_expiring_soon(500)); // Already expired, so it's "expiring" anytime
+
+        // Test with valid token
+        let valid_token = TokenInfo {
+            access_token: SecretString::new("valid_token".to_string()),
+            token_type: "Bearer".to_string(),
+            expires_at: Some(now + 1000), // Expires in 1000 seconds
+            refresh_token: Some(SecretString::new("refresh_token".to_string())),
+            refresh_token_expires_at: Some(now + 2000), // Valid refresh token
+        };
+
+        let auth_manager_valid = AuthManager {
+            client_id: GITHUB_OAUTH_CLIENT_ID.to_string(),
+            token_info: Some(valid_token),
+            keychain_entry: None,
+        };
+
+        assert!(!auth_manager_valid.is_access_token_expired());
+        assert!(!auth_manager_valid.is_access_token_expiring_soon(100)); // Won't expire in next 100 seconds
+        assert!(auth_manager_valid.is_access_token_expiring_soon(1500)); // Will expire in 1500 seconds
+    }
+
+    #[test]
+    fn test_refresh_token_validation() {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        // Test with no refresh token
+        let no_refresh_token = TokenInfo {
+            access_token: SecretString::new("token".to_string()),
+            token_type: "Bearer".to_string(),
+            expires_at: Some(now + 1000),
+            refresh_token: None, // No refresh token
+            refresh_token_expires_at: None,
+        };
+
+        let auth_manager_no_refresh = AuthManager {
+            client_id: GITHUB_OAUTH_CLIENT_ID.to_string(),
+            token_info: Some(no_refresh_token),
+            keychain_entry: None,
+        };
+
+        assert!(auth_manager_no_refresh.is_refresh_token_expired());
+
+        // Test with expired refresh token
+        let expired_refresh_token = TokenInfo {
+            access_token: SecretString::new("token".to_string()),
+            token_type: "Bearer".to_string(),
+            expires_at: Some(now + 1000),
+            refresh_token: Some(SecretString::new("refresh_token".to_string())),
+            refresh_token_expires_at: Some(now - 100), // Expired
+        };
+
+        let auth_manager_expired_refresh = AuthManager {
+            client_id: GITHUB_OAUTH_CLIENT_ID.to_string(),
+            token_info: Some(expired_refresh_token),
+            keychain_entry: None,
+        };
+
+        assert!(auth_manager_expired_refresh.is_refresh_token_expired());
+
+        // Test with valid refresh token
+        let valid_refresh_token = TokenInfo {
+            access_token: SecretString::new("token".to_string()),
+            token_type: "Bearer".to_string(),
+            expires_at: Some(now + 1000),
+            refresh_token: Some(SecretString::new("refresh_token".to_string())),
+            refresh_token_expires_at: Some(now + 1000), // Valid
+        };
+
+        let auth_manager_valid_refresh = AuthManager {
+            client_id: GITHUB_OAUTH_CLIENT_ID.to_string(),
+            token_info: Some(valid_refresh_token),
+            keychain_entry: None,
+        };
+
+        assert!(!auth_manager_valid_refresh.is_refresh_token_expired());
+    }
+
+    #[tokio::test]
+    async fn test_perform_reauthentication_with_notification() {
+        // Note: This test doesn't actually perform re-authentication since that requires network interaction
+        // This is just to test that the method exists and can be called
+        let mut auth_manager = AuthManager {
+            client_id: GITHUB_OAUTH_CLIENT_ID.to_string(),
+            token_info: None,
+            keychain_entry: None,
+        };
+
+        // We expect this to fail since there's no actual token to refresh
+        // but we're testing that the method is callable
+        let result = auth_manager.perform_reauthentication_with_notification().await;
+        // The result should be an error since we don't have a real authentication flow in tests
+        assert!(result.is_err());
     }
 }
