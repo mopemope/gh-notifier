@@ -10,7 +10,7 @@ async fn main() -> Result<(), AuthError> {
     if let Ok(Some(token_info)) = auth_manager.load_token_from_keychain() {
         println!("Found existing token in keychain");
         auth_manager.token_info = Some(token_info);
-        
+
         // Use the comprehensive token management - handles validation, refresh, and re-auth
         match auth_manager.get_valid_token_with_reauth().await {
             Ok(_) => {
