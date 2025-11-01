@@ -3,21 +3,12 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct State {
     /// 最終確認日時（ISO 8601形式）
     pub last_checked_at: Option<String>,
     /// ETagのマップ（URL -> ETag）
     pub etags: HashMap<String, String>,
-}
-
-impl Default for State {
-    fn default() -> Self {
-        State {
-            last_checked_at: None,
-            etags: HashMap::new(),
-        }
-    }
 }
 
 pub struct StateManager {
@@ -99,14 +90,32 @@ mod tests {
 
     #[test]
     fn test_state_serialization() {
-        let mut state = State::default();
-        state.last_checked_at = Some("2023-01-01T00:00:00Z".to_string());
-        state.etags.insert("https://api.github.com/notifications".to_string(), "etag123".to_string());
+        use std::collections::HashMap;
+
+        let state = State {
+            last_checked_at: Some("2023-01-01T00:00:00Z".to_string()),
+            etags: {
+                let mut map = HashMap::new();
+                map.insert(
+                    "https://api.github.com/notifications".to_string(),
+                    "etag123".to_string(),
+                );
+                map
+            },
+        };
 
         let serialized = serde_json::to_string(&state).unwrap();
         let deserialized: State = serde_json::from_str(&serialized).unwrap();
 
-        assert_eq!(deserialized.last_checked_at, Some("2023-01-01T00:00:00Z".to_string()));
-        assert_eq!(deserialized.etags.get("https://api.github.com/notifications"), Some(&"etag123".to_string()));
+        assert_eq!(
+            deserialized.last_checked_at,
+            Some("2023-01-01T00:00:00Z".to_string())
+        );
+        assert_eq!(
+            deserialized
+                .etags
+                .get("https://api.github.com/notifications"),
+            Some(&"etag123".to_string())
+        );
     }
 }

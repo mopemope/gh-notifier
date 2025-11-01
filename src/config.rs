@@ -88,7 +88,7 @@ mod tests {
     fn test_default_config() {
         let config = Config::default();
         assert_eq!(config.poll_interval_sec, 30);
-        assert_eq!(config.mark_as_read_on_notify, false);
+        assert!(!config.mark_as_read_on_notify);
         assert_eq!(config.client_id, "Iv1.898a6d2a86c3f7aa");
     }
 
@@ -110,7 +110,7 @@ mod tests {
         "#;
         let config: Config = toml::from_str(toml_str).unwrap();
         assert_eq!(config.poll_interval_sec, 60);
-        assert_eq!(config.mark_as_read_on_notify, true);
+        assert!(config.mark_as_read_on_notify);
         assert_eq!(config.client_id, "custom-client-id");
     }
 
@@ -121,7 +121,7 @@ mod tests {
         "#;
         let config: Config = toml::from_str(toml_str).unwrap();
         assert_eq!(config.poll_interval_sec, 45);
-        assert_eq!(config.mark_as_read_on_notify, false); // デフォルト
+        assert!(!config.mark_as_read_on_notify); // デフォルト
         assert_eq!(config.client_id, "Iv1.898a6d2a86c3f7aa"); // デフォルト
     }
 
@@ -130,7 +130,7 @@ mod tests {
         // 存在しないファイルパスでテスト
         let config = Config::default();
         assert_eq!(config.poll_interval_sec, 30);
-        assert_eq!(config.mark_as_read_on_notify, false);
+        assert!(!config.mark_as_read_on_notify);
         assert_eq!(config.client_id, "Iv1.898a6d2a86c3f7aa");
     }
 }
