@@ -1,9 +1,10 @@
 ---
 id: task-9
 title: 通知ポーリング処理（Poller）の実装
-status: To Do
+status: Done
 assignee: []
 created_date: '2025-11-01 02:33'
+updated_date: '2025-11-01 05:35'
 labels:
   - poller
   - implementation
