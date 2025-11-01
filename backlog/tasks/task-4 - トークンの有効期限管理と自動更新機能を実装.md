@@ -1,9 +1,10 @@
 ---
 id: task-4
 title: トークンの有効期限管理と自動更新機能を実装
-status: To Do
+status: Done
 assignee: []
 created_date: '2025-10-31 11:24'
+updated_date: '2025-11-01 00:34'
 labels:
   - auth
   - token-management

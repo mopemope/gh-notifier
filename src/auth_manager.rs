@@ -2,6 +2,7 @@ use crate::{AuthError, DeviceAuthResponse, ErrorResponse, TokenInfo, TokenRespon
 use keyring::Entry;
 use secrecy::{ExposeSecret, SecretString};
 use std::sync::Arc;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 const GITHUB_OAUTH_CLIENT_ID: &str = "Iv1.898a6d2a86c3f7aa"; // This would be configurable in a real app
 const GITHUB_DEVICE_AUTHORIZATION_URL: &str = "https://github.com/login/device/code";
@@ -320,6 +321,151 @@ impl AuthManager {
             ))
         }
     }
+
+    /// Checks if the access token has expired
+    pub fn is_access_token_expired(&self) -> bool {
+        if let Some(ref token_info) = self.token_info {
+            if let Some(expires_at) = token_info.expires_at {
+                let now = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs();
+                return now >= expires_at;
+            }
+            // If token exists but has no expiration time, assume it doesn't expire
+            return false;
+        }
+        // If there's no token at all, it's considered expired
+        true
+    }
+
+    /// Checks if the access token will expire soon (within the specified number of seconds)
+    pub fn is_access_token_expiring_soon(&self, within_seconds: u64) -> bool {
+        if let Some(ref token_info) = self.token_info {
+            if let Some(expires_at) = token_info.expires_at {
+                let now = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs();
+                
+                // Check if the token will expire within the specified time window
+                return now + within_seconds >= expires_at;
+            }
+            // If token exists but has no expiration time, it won't expire soon
+            return false;
+        }
+        // If there's no token at all, then it's expiring soon (meaning we need to get one)
+        true
+    }
+
+    /// Checks if the refresh token has expired
+    pub fn is_refresh_token_expired(&self) -> bool {
+        if let Some(ref token_info) = self.token_info {
+            if let Some(refresh_expires_at) = token_info.refresh_token_expires_at {
+                let now = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs();
+                return now >= refresh_expires_at;
+            }
+        }
+        // If there's no refresh token or expiration, assume it's expired
+        self.token_info.as_ref().and_then(|t| t.refresh_token.as_ref()).is_none()
+    }
+
+    /// Gets a valid access token, refreshing it if necessary
+    /// This is the main method for automatic token management
+    pub async fn get_valid_token(&mut self) -> Result<String, AuthError> {
+        // If no token is available, we need to authenticate first
+        if self.token_info.is_none() {
+            return Err(AuthError::GeneralError(
+                "No token available, authentication required".to_string(),
+            ));
+        }
+
+        // Check if the access token is expired or will expire soon (within 300 seconds = 5 minutes)
+        if self.is_access_token_expiring_soon(300) {
+            // If the token will expire soon, try to refresh it
+            match self.maybe_refresh_token().await {
+                Ok(token_info) => {
+                    // Update the token info and return the new access token
+                    self.token_info = Some(token_info.clone());
+                    Ok(token_info.access_token.expose_secret().clone())
+                }
+                Err(e) => {
+                    // If refresh failed, return the error
+                    // This might be a case where we need to re-authenticate
+                    Err(e)
+                }
+            }
+        } else {
+            // Token is still valid, return it
+            Ok(self.token_info.as_ref().unwrap().access_token.expose_secret().clone())
+        }
+    }
+
+    /// Attempts to refresh the token if it's expired or will expire soon
+    pub async fn maybe_refresh_token(&mut self) -> Result<TokenInfo, AuthError> {
+        // Check if we have a refresh token and if it's expired
+        if self.is_refresh_token_expired() {
+            return Err(AuthError::GeneralError(
+                "Refresh token is expired, re-authentication required".to_string(),
+            ));
+        }
+
+        // If we have a valid refresh token, try to refresh the access token
+        if !self.is_access_token_expired() && !self.is_access_token_expiring_soon(300) {
+            // Token is not expired or expiring soon, no need to refresh
+            return Ok(self.token_info.as_ref().unwrap().clone());
+        }
+
+        // Attempt to refresh the token
+        match self.refresh_token().await {
+            Ok(token_info) => {
+                // Save the new token to keychain
+                if let Err(e) = self.save_token_to_keychain(&token_info) {
+                    eprintln!("Failed to save refreshed token to keychain: {:?}", e);
+                }
+                Ok(token_info)
+            }
+            Err(e) => {
+                // If refresh failed, check if it's because the refresh token itself is invalid
+                // The refresh token endpoint might return specific error codes when the refresh token is invalid
+                match &e {
+                    AuthError::OAuthError { code, .. } => {
+                        if code == "invalid_grant" || code == "access_denied" {
+                            // If the refresh token is invalid, we need to re-authenticate
+                            Err(AuthError::GeneralError(
+                                "Refresh token is invalid, re-authentication required".to_string(),
+                            ))
+                        } else {
+                            // Some other error occurred during refresh
+                            Err(e)
+                        }
+                    }
+                    _ => Err(e),
+                }
+            }
+        }
+    }
+
+    /// Initiates re-authentication when refresh tokens are no longer valid
+    pub async fn initiate_reauthentication(&mut self) -> Result<TokenInfo, AuthError> {
+        // First, delete the old (invalid) token from keychain
+        if let Err(e) = self.delete_token_from_keychain() {
+            eprintln!("Warning: failed to delete old token from keychain: {:?}", e);
+        }
+
+        // Perform the full authentication flow
+        let token_info = self.authenticate().await?;
+        
+        // Save the new token to keychain
+        if let Err(e) = self.save_token_to_keychain(&token_info) {
+            eprintln!("Failed to save new token to keychain: {:?}", e);
+        }
+        
+        Ok(token_info)
+    }
 }
 
 #[cfg(test)]
@@ -354,5 +500,153 @@ mod tests {
 
         assert_eq!(deserialized.token_type, "Bearer");
         assert_eq!(deserialized.expires_at, Some(1234567890));
+    }
+
+    #[test]
+    fn test_token_expiration_checking() {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        // Create an AuthManager instance without using keychain
+        let mut auth_manager = AuthManager {
+            client_id: GITHUB_OAUTH_CLIENT_ID.to_string(),
+            token_info: None,
+            keychain_entry: None,
+        };
+
+        // Test 1: Token that is expired
+        let expired_token = TokenInfo {
+            access_token: SecretString::new("expired_token".to_string()),
+            token_type: "Bearer".to_string(),
+            expires_at: Some(now - 3600), // Expired 1 hour ago
+            refresh_token: Some(SecretString::new("refresh_token".to_string())),
+            refresh_token_expires_at: Some(now + 3600), // Expires in 1 hour
+        };
+        auth_manager.token_info = Some(expired_token);
+
+        assert!(auth_manager.is_access_token_expired());
+        assert!(auth_manager.is_access_token_expiring_soon(7200)); // Will expire within 2 hours (already expired)
+
+        // Test 2: Token that will expire soon
+        let expiring_soon_token = TokenInfo {
+            access_token: SecretString::new("expiring_token".to_string()),
+            token_type: "Bearer".to_string(),
+            expires_at: Some(now + 180), // Expires in 3 minutes
+            refresh_token: Some(SecretString::new("refresh_token".to_string())),
+            refresh_token_expires_at: Some(now + 3600), // Expires in 1 hour
+        };
+        auth_manager.token_info = Some(expiring_soon_token);
+
+        assert!(!auth_manager.is_access_token_expired()); // Not expired yet
+        assert!(auth_manager.is_access_token_expiring_soon(600)); // Will expire within 10 minutes
+        assert!(!auth_manager.is_access_token_expiring_soon(60)); // Won't expire within 1 minute
+
+        // Test 3: Valid token that won't expire soon
+        let valid_token = TokenInfo {
+            access_token: SecretString::new("valid_token".to_string()),
+            token_type: "Bearer".to_string(),
+            expires_at: Some(now + 7200), // Expires in 2 hours
+            refresh_token: Some(SecretString::new("refresh_token".to_string())),
+            refresh_token_expires_at: Some(now + 3600), // Expires in 1 hour
+        };
+        auth_manager.token_info = Some(valid_token);
+
+        assert!(!auth_manager.is_access_token_expired());
+        assert!(!auth_manager.is_access_token_expiring_soon(1800)); // Won't expire within 30 minutes
+
+        // Test 4: Expired refresh token
+        let expired_refresh_token = TokenInfo {
+            access_token: SecretString::new("valid_access_token".to_string()),
+            token_type: "Bearer".to_string(),
+            expires_at: Some(now + 7200), // Expires in 2 hours
+            refresh_token: Some(SecretString::new("refresh_token".to_string())),
+            refresh_token_expires_at: Some(now - 3600), // Expired 1 hour ago
+        };
+        auth_manager.token_info = Some(expired_refresh_token);
+
+        assert!(auth_manager.is_refresh_token_expired());
+
+        // Test 5: Valid refresh token
+        let valid_refresh_token = TokenInfo {
+            access_token: SecretString::new("valid_access_token".to_string()),
+            token_type: "Bearer".to_string(),
+            expires_at: Some(now + 7200), // Expires in 2 hours
+            refresh_token: Some(SecretString::new("refresh_token".to_string())),
+            refresh_token_expires_at: Some(now + 36000), // Expires in 10 hours
+        };
+        auth_manager.token_info = Some(valid_refresh_token);
+
+        assert!(!auth_manager.is_refresh_token_expired());
+    }
+
+    #[tokio::test]
+    async fn test_get_valid_token_with_expired_token() {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        // Create an AuthManager instance without using keychain
+        let mut auth_manager = AuthManager {
+            client_id: GITHUB_OAUTH_CLIENT_ID.to_string(),
+            token_info: None,
+            keychain_entry: None,
+        };
+
+        // Set up an expired token
+        let expired_token = TokenInfo {
+            access_token: SecretString::new("expired_token".to_string()),
+            token_type: "Bearer".to_string(),
+            expires_at: Some(now - 3600), // Expired 1 hour ago
+            refresh_token: Some(SecretString::new("refresh_token".to_string())),
+            refresh_token_expires_at: Some(now + 3600), // Expires in 1 hour
+        };
+        auth_manager.token_info = Some(expired_token);
+
+        // Since we don't have a valid refresh token method for testing without network,
+        // we'll just test that it recognizes the token as expired
+        assert!(auth_manager.is_access_token_expired());
+        assert!(auth_manager.is_access_token_expiring_soon(0)); // Should be expiring "now" since it's already expired
+    }
+
+    #[test]
+    fn test_token_without_expiration() {
+        // Create an AuthManager without token info
+        let auth_manager = AuthManager {
+            client_id: GITHUB_OAUTH_CLIENT_ID.to_string(),
+            token_info: None,
+            keychain_entry: None,
+        };
+
+        // Token should be considered expired if there's no token info
+        assert!(auth_manager.is_access_token_expired());
+
+        // Create a token without expiration time
+        let no_expiry_token = TokenInfo {
+            access_token: SecretString::new("token_no_expiry".to_string()),
+            token_type: "Bearer".to_string(),
+            expires_at: None, // No expiration time
+            refresh_token: Some(SecretString::new("refresh_token".to_string())),
+            refresh_token_expires_at: None, // No expiration time
+        };
+        
+        let auth_manager_with_token = AuthManager {
+            client_id: GITHUB_OAUTH_CLIENT_ID.to_string(),
+            token_info: Some(no_expiry_token),
+            keychain_entry: None,
+        };
+
+        // Token without expiration should NOT be considered expiring soon (as a safety measure)
+        // Only tokens that actually exist without expiration are considered valid
+        assert!(!auth_manager_with_token.is_access_token_expiring_soon(0));
+        
+        // But it should not be considered expired (since it has no expiration)
+        assert!(!auth_manager_with_token.is_access_token_expired());
     }
 }
