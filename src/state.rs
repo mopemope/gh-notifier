@@ -80,6 +80,8 @@ impl StateManager {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
+    use tempfile::NamedTempFile;
 
     #[test]
     fn test_state_default() {
@@ -117,5 +119,55 @@ mod tests {
                 .get("https://api.github.com/notifications"),
             Some(&"etag123".to_string())
         );
+    }
+
+    #[test]
+    fn test_state_manager_new_with_file() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let temp_path = temp_file.path();
+        let state_manager = StateManager {
+            state_file_path: temp_path.to_path_buf(),
+            state: State::default(),
+        };
+        // ファイルに保存
+        state_manager.save().unwrap();
+        // ファイルから読み込み
+        let state_manager2 = StateManager::new().unwrap();
+        assert!(state_manager2.state.last_checked_at.is_none());
+        assert!(state_manager2.state.etags.is_empty());
+    }
+
+    #[test]
+    fn test_state_manager_save_error() {
+        // 書き込み権限がないディレクトリを指定
+        let state_manager = StateManager {
+            state_file_path: std::path::PathBuf::from("/"),
+            state: State::default(),
+        };
+        let result = state_manager.save();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_state_manager_get_set_last_checked_at() {
+        let mut state_manager = StateManager {
+            state_file_path: std::path::PathBuf::new(),
+            state: State::default(),
+        };
+        let timestamp = "2023-01-01T00:00:00Z".to_string();
+        state_manager.update_last_checked_at(timestamp.clone());
+        assert_eq!(state_manager.get_last_checked_at(), Some(timestamp.as_str()));
+    }
+
+    #[test]
+    fn test_state_manager_get_set_etag() {
+        let mut state_manager = StateManager {
+            state_file_path: std::path::PathBuf::new(),
+            state: State::default(),
+        };
+        let url = "https://api.github.com/notifications".to_string();
+        let etag = "etag123".to_string();
+        state_manager.update_etag(url.clone(), etag.clone());
+        assert_eq!(state_manager.get_etag(&url), Some(etag.as_str()));
     }
 }

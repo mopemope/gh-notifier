@@ -17,3 +17,6 @@ base64 = "0.21"
 notify-rust = "4.10"
 mac-notification-sys = { version = "0.6", optional = true }
 winrt-notification = { version = "0.5", optional = true }
+
+[dev-dependencies]
+tempfile = "3.0"

@@ -1,7 +1,7 @@
 ---
 id: task-11
 title: 状態管理（StateManager）の実装
-status: To Do
+status: Done
 assignee: []
 created_date: '2025-11-01 02:34'
 labels:
