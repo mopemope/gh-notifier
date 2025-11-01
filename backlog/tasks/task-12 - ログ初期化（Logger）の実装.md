@@ -1,9 +1,10 @@
 ---
 id: task-12
 title: ログ初期化（Logger）の実装
-status: To Do
+status: Done
 assignee: []
 created_date: '2025-11-01 02:34'
+updated_date: '2025-11-01 09:00'
 labels:
   - logging
   - implementation

@@ -98,6 +98,10 @@ pub struct Config {
     /// GitHub OAuth Client ID（省略可）
     #[serde(default = "default_client_id")]
     pub client_id: String,
+
+    /// ログレベル（省略可、デフォルト: info）
+    #[serde(default = "default_log_level")]
+    pub log_level: String,
 }
 
 // デフォルト値の定義
@@ -114,6 +118,10 @@ fn default_client_id() -> String {
     "Iv1.898a6d2a86c3f7aa".to_string()
 }
 
+fn default_log_level() -> String {
+    "info".to_string()
+}
+
 impl Default for Config {
     fn default() -> Self {
         Config {
@@ -123,6 +131,7 @@ impl Default for Config {
             notification_batch_config: NotificationBatchConfig::default(),
             polling_error_handling_config: PollingErrorHandlingConfig::default(),
             client_id: default_client_id(),
+            log_level: default_log_level(),
         }
     }
 }
@@ -210,6 +219,37 @@ mod tests {
         assert_eq!(config.client_id, "Iv1.898a6d2a86c3f7aa"); // デフォルト
     }
 
+    #[test]
+    fn test_log_level_default() {
+        let config = Config::default();
+        assert_eq!(config.log_level, "info");
+    }
+
+    #[test]
+    fn test_log_level_custom() {
+        let toml_str = r#"
+            log_level = "debug"
+            poll_interval_sec = 30
+        "#;
+        let config: Config = toml::from_str(toml_str).unwrap();
+        assert_eq!(config.log_level, "debug");
+    }
+
+    #[test]
+    fn test_log_level_with_other_fields() {
+        let toml_str = r#"
+            poll_interval_sec = 60
+            mark_as_read_on_notify = true
+            client_id = "custom-client-id"
+            log_level = "warn"
+        "#;
+        let config: Config = toml::from_str(toml_str).unwrap();
+        assert_eq!(config.log_level, "warn");
+        assert_eq!(config.poll_interval_sec, 60);
+        assert!(config.mark_as_read_on_notify);
+        assert_eq!(config.client_id, "custom-client-id");
+    }
+
     #[tokio::test]
     async fn test_load_default_config() {
         // 存在しないファイルパスでテスト
@@ -217,5 +257,6 @@ mod tests {
         assert_eq!(config.poll_interval_sec, 30);
         assert!(!config.mark_as_read_on_notify);
         assert_eq!(config.client_id, "Iv1.898a6d2a86c3f7aa");
+        assert_eq!(config.log_level, "info");
     }
 }
