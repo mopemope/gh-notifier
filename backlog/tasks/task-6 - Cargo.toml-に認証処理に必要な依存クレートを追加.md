@@ -1,9 +1,10 @@
 ---
 id: task-6
 title: Cargo.toml に認証処理に必要な依存クレートを追加
-status: To Do
+status: Done
 assignee: []
 created_date: '2025-10-31 11:24'
+updated_date: '2025-11-01 02:01'
 labels:
   - dependencies
   - setup

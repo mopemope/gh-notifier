@@ -649,12 +649,14 @@ dependencies = [
 name = "gh-notifier"
 version = "0.1.0"
 dependencies = [
+ "base64",
  "keyring",
  "reqwest",
  "secrecy",
  "serde",
  "serde_json",
  "tokio",
+ "url",
 ]
 
 [[package]]
