@@ -81,6 +81,38 @@ pub struct ErrorResponse {
     pub error_uri: Option<String>,
 }
 
+// --- GitHub API 通知モデル ---
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct Notification {
+    pub id: String,
+    pub unread: bool,
+    pub reason: String,
+    pub updated_at: String, // ISO 8601
+    pub last_read_at: Option<String>,
+    pub subject: NotificationSubject,
+    pub repository: NotificationRepository,
+    pub url: String,
+    pub subscription_url: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct NotificationSubject {
+    pub title: String,
+    pub url: Option<String>,
+    pub latest_comment_url: Option<String>,
+    #[serde(rename = "type")]
+    pub kind: String, // Issue, PullRequest, etc.
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct NotificationRepository {
+    pub id: u64,
+    pub node_id: String,
+    pub name: String,
+    pub full_name: String,
+    pub private: bool,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -44,9 +44,8 @@ impl Default for Config {
 
 /// 設定ファイルのパスを取得
 fn config_file_path() -> PathBuf {
-    let mut path = dirs::config_dir().unwrap_or_else(|| {
-        std::env::current_dir().expect("現在のディレクトリが取得できません")
-    });
+    let mut path = dirs::config_dir()
+        .unwrap_or_else(|| std::env::current_dir().expect("現在のディレクトリが取得できません"));
     path.push("gh-notifier");
     path.push("config.toml");
     path

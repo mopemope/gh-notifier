@@ -1,9 +1,10 @@
 ---
 id: task-8
 title: GitHub APIクライアント（GitHubClient）の実装
-status: To Do
+status: Done
 assignee: []
 created_date: '2025-11-01 02:33'
+updated_date: '2025-11-01 02:45'
 labels:
   - api
   - implementation
