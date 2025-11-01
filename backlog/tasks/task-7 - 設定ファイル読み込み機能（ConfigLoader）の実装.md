@@ -1,9 +1,10 @@
 ---
 id: task-7
 title: 設定ファイル読み込み機能（ConfigLoader）の実装
-status: To Do
+status: Done
 assignee: []
 created_date: '2025-11-01 02:33'
+updated_date: '2025-11-01 02:42'
 labels:
   - config
   - implementation
