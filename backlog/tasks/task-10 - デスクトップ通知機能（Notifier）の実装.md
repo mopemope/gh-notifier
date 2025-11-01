@@ -1,7 +1,7 @@
 ---
 id: task-10
 title: デスクトップ通知機能（Notifier）の実装
-status: To Do
+status: Done
 assignee: []
 created_date: '2025-11-01 02:34'
 labels:

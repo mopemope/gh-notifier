@@ -2,7 +2,7 @@ use crate::poller::Notifier;
 use crate::{Config, GitHubClient, Notification, StateManager};
 use std::collections::VecDeque;
 use std::time::Duration as StdDuration;
-use tokio::time::{interval, Instant};
+use tokio::time::{Instant, interval};
 
 pub async fn run_polling_loop(
     config: &Config,
@@ -13,7 +13,8 @@ pub async fn run_polling_loop(
     let mut interval = interval(StdDuration::from_secs(config.poll_interval_sec));
     // バッチ処理用のバッファとタイマー
     let batch_size = config.notification_batch_config.batch_size;
-    let batch_interval = StdDuration::from_secs(config.notification_batch_config.batch_interval_sec);
+    let batch_interval =
+        StdDuration::from_secs(config.notification_batch_config.batch_interval_sec);
     let error_handling = &config.polling_error_handling_config;
     let mut batch_buffer: VecDeque<Notification> = VecDeque::new();
     let mut last_batch_time = Instant::now();
@@ -25,7 +26,10 @@ pub async fn run_polling_loop(
         let if_modified_since = state_manager.get_last_checked_at();
 
         // GitHub API から通知を取得
-        match github_client.get_notifications(if_modified_since, None).await {
+        match github_client
+            .get_notifications(if_modified_since, None)
+            .await
+        {
             Ok(Some(notifications)) => {
                 // 最終確認日時以降の新しい通知のみを処理
                 let new_notifications = crate::polling::filter::filter_new_notifications(
@@ -47,8 +51,18 @@ pub async fn run_polling_loop(
                         }
 
                         // バッチサイズに達したか、時間経過時に処理
-                        if batch_buffer.len() >= batch_size || last_batch_time.elapsed() >= batch_interval {
-                            if let Err(e) = process_batch(&batch_buffer, notifier, github_client, config, error_handling).await {
+                        if batch_buffer.len() >= batch_size
+                            || last_batch_time.elapsed() >= batch_interval
+                        {
+                            if let Err(e) = process_batch(
+                                &batch_buffer,
+                                notifier,
+                                github_client,
+                                config,
+                                error_handling,
+                            )
+                            .await
+                            {
                                 eprintln!("Failed to process batch: {}", e);
                             }
                             batch_buffer.clear();
@@ -59,11 +73,13 @@ pub async fn run_polling_loop(
                         for notification in new_notifications {
                             // 通知を Notifier に渡す
                             if let Err(e) = crate::polling::handler::handle_notification(
-                                &notification,
+                                notification,
                                 notifier,
                                 github_client,
                                 config.mark_as_read_on_notify,
-                            ).await {
+                            )
+                            .await
+                            {
                                 eprintln!("Failed to handle notification: {}", e);
                             }
                         }
@@ -101,7 +117,9 @@ async fn process_batch(
             notifier,
             github_client,
             config.mark_as_read_on_notify,
-        ).await {
+        )
+        .await
+        {
             eprintln!("Failed to handle notification: {}", e);
         }
     }

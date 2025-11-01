@@ -1,7 +1,7 @@
 ---
 id: task-10.4
 title: 通知クリック時のURL開機能
-status: To Do
+status: Done
 assignee: []
 created_date: '2025-11-01 02:38'
 labels:

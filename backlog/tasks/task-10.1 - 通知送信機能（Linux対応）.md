@@ -1,7 +1,7 @@
 ---
 id: task-10.1
 title: 通知送信機能（Linux対応）
-status: To Do
+status: Done
 assignee: []
 created_date: '2025-11-01 02:38'
 labels:

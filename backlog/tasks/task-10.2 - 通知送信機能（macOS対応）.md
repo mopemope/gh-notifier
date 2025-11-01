@@ -1,7 +1,7 @@
 ---
 id: task-10.2
 title: 通知送信機能（macOS対応）
-status: To Do
+status: Done
 assignee: []
 created_date: '2025-11-01 02:38'
 labels:

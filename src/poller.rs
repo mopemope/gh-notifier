@@ -51,15 +51,63 @@ impl Notifier for DesktopNotifier {
         &self,
         title: &str,
         body: &str,
-        _url: &str, // url は使用していないので、アンダースコア接頭辞を付ける
+        url: &str, // url を使用する
     ) -> Result<(), Box<dyn std::error::Error>> {
         Notification::new()
             .summary(title)
             .body(body)
             .icon("dialog-information") // 任意のアイコン
             .hint(notify_rust::Hint::Transient(true)) // 通知を自動的に消す
+            .hint(notify_rust::Hint::Custom("default-action".to_string(), url.to_string()))
             .show()
             .map_err(|e| Box::new(std::io::Error::other(e)))?;
+        Ok(())
+    }
+}
+
+#[cfg(target_os = "macos")]
+pub struct MacNotifier;
+
+#[cfg(target_os = "macos")]
+impl Notifier for MacNotifier {
+    fn send_notification(
+        &self,
+        title: &str,
+        body: &str,
+        _url: &str, // url は使用していないので、アンダースコア接頭辞を付ける
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        mac_notification_sys::set_application(&"gh-notifier")?;
+        mac_notification_sys::send_notification(
+            &title,
+            &Some(&body),
+            &"",
+            &None,
+        )?;
+        Ok(())
+    }
+}
+
+#[cfg(target_os = "windows")]
+pub struct WindowsNotifier;
+
+#[cfg(target_os = "windows")]
+impl Notifier for WindowsNotifier {
+    fn send_notification(
+        &self,
+        title: &str,
+        body: &str,
+        url: &str, // url を使用する
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        use winrt_notification::Toast;
+
+        Toast::new(Toast::POWERSHELL_APP_ID)
+            .title(&title)
+            .text1(&body)
+            .activation_type(winrt_notification::ActivationType::Protocol)
+            .launch(&url)
+            .show()
+            .map_err(|e| Box::new(std::io::Error::other(e)))?;
+
         Ok(())
     }
 }
@@ -169,5 +217,22 @@ mod tests {
 
         assert_eq!(new_notifications.len(), 1);
         assert_eq!(new_notifications[0].id, "2");
+    }
+
+    #[test]
+    fn test_desktop_notifier_send_notification() {
+        let notifier = DesktopNotifier;
+        // テストでは通知を表示しないが、エラーが発生しないことを確認
+        let result = notifier.send_notification("Test Title", "Test Body", "https://example.com");
+        assert!(result.is_ok());
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn test_windows_notifier_send_notification() {
+        let notifier = WindowsNotifier;
+        // テストでは通知を表示しないが、エラーが発生しないことを確認
+        let result = notifier.send_notification("Test Title", "Test Body", "https://example.com");
+        assert!(result.is_ok());
     }
 }
