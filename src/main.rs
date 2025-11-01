@@ -1,4 +1,5 @@
-use gh_notifier::{AuthError, AuthManager};
+use gh_notifier::config::load_config;
+use gh_notifier::{AuthError, GitHubClient, Poller, StateManager, auth_manager::AuthManager};
 
 #[tokio::main]
 async fn main() -> Result<(), AuthError> {
@@ -35,6 +36,22 @@ async fn main() -> Result<(), AuthError> {
         }
     }
 
+    // 設定を読み込む
+    let config = load_config().unwrap_or_else(|e| {
+        eprintln!("Failed to load config: {}", e);
+        std::process::exit(1);
+    });
+
+    // GitHubクライアント、ステートマネージャー、通知マネージャーを初期化
+    let github_client = GitHubClient::new(auth_manager).unwrap();
+    let state_manager = StateManager::new().unwrap();
+    let notifier = Box::new(gh_notifier::DesktopNotifier);
+
+    // Pollerを初期化して実行
+    let mut poller = Poller::new(config, github_client, state_manager, notifier);
+
     println!("GitHub Notifier running with authenticated access");
+    poller.run().await.unwrap();
+
     Ok(())
 }

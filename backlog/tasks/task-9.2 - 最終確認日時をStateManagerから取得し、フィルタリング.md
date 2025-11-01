@@ -1,9 +1,10 @@
 ---
 id: task-9.2
 title: 最終確認日時をStateManagerから取得し、フィルタリング
-status: To Do
+status: Done
 assignee: []
 created_date: '2025-11-01 02:37'
+updated_date: '2025-11-01 08:11'
 labels:
   - poller
   - state

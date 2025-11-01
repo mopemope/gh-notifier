@@ -1,9 +1,10 @@
 ---
 id: task-9.1
 title: 'ポーリング処理の基本ルーチン実装（tokio::time::interval）'
-status: To Do
+status: Done
 assignee: []
 created_date: '2025-11-01 02:37'
+updated_date: '2025-11-01 08:11'
 labels:
   - poller
   - implementation

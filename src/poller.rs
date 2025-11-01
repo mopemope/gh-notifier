@@ -1,4 +1,5 @@
 use crate::{Config, GitHubClient, StateManager};
+use notify_rust::Notification;
 
 pub trait Notifier: Send + Sync {
     fn send_notification(
@@ -43,6 +44,26 @@ impl Poller {
     }
 }
 
+pub struct DesktopNotifier;
+
+impl Notifier for DesktopNotifier {
+    fn send_notification(
+        &self,
+        title: &str,
+        body: &str,
+        _url: &str, // url は使用していないので、アンダースコア接頭辞を付ける
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        Notification::new()
+            .summary(title)
+            .body(body)
+            .icon("dialog-information") // 任意のアイコン
+            .hint(notify_rust::Hint::Transient(true)) // 通知を自動的に消す
+            .show()
+            .map_err(|e| Box::new(std::io::Error::other(e)))?;
+        Ok(())
+    }
+}
+
 struct DummyNotifier;
 
 impl Notifier for DummyNotifier {
@@ -82,7 +103,7 @@ mod tests {
         let github_client = GitHubClient::new(auth_manager).unwrap();
         let state_manager = StateManager::new().unwrap();
         let notifier: Box<dyn Notifier> = Box::new(DummyNotifier);
-        let _poller = Poller::new(config, github_client, state_manager, notifier);
+        let _poller = Poller::new(config.clone(), github_client, state_manager, notifier);
 
         let old_time = "2023-01-01T00:00:00Z";
         let new_time = "2023-01-02T00:00:00Z";
@@ -140,14 +161,11 @@ mod tests {
 
         // フィルタリング処理（実際にはPoller構造体に状態がないため、外部から行う）
         let new_notifications: Vec<&Notification> =
-            if let Some(last_checked) = state_manager.get_last_checked_at() {
-                notifications
-                    .iter()
-                    .filter(|n| n.updated_at.as_str() > last_checked)
-                    .collect()
-            } else {
-                notifications.iter().collect()
-            };
+            crate::polling::filter::filter_new_notifications(
+                &notifications,
+                &state_manager,
+                &config,
+            );
 
         assert_eq!(new_notifications.len(), 1);
         assert_eq!(new_notifications[0].id, "2");

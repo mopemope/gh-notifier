@@ -2,6 +2,76 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 
+/// 通知フィルタの設定
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct NotificationFilter {
+    /// 除外するリポジトリのリスト
+    #[serde(default)]
+    pub exclude_repositories: Vec<String>,
+
+    /// 除外する通知の理由のリスト（例: "mention", "comment", "subscribed" など）
+    #[serde(default)]
+    pub exclude_reasons: Vec<String>,
+}
+
+/// 通知バッチ処理の設定
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NotificationBatchConfig {
+    /// 通知バッチの最大数（0の場合はバッチ処理を行わない）
+    #[serde(default = "default_batch_size")]
+    pub batch_size: usize,
+
+    /// バッチ処理の間隔（秒）
+    #[serde(default = "default_batch_interval_sec")]
+    pub batch_interval_sec: u64,
+}
+
+fn default_batch_size() -> usize {
+    0 // バッチ処理を無効にするデフォルト
+}
+
+fn default_batch_interval_sec() -> u64 {
+    30
+}
+
+impl Default for NotificationBatchConfig {
+    fn default() -> Self {
+        NotificationBatchConfig {
+            batch_size: default_batch_size(),
+            batch_interval_sec: default_batch_interval_sec(),
+        }
+    }
+}
+
+/// ポーリング処理のエラーハンドリング設定
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PollingErrorHandlingConfig {
+    /// エラー発生時の再試行回数
+    #[serde(default = "default_retry_count")]
+    pub retry_count: u32,
+
+    /// 再試行間隔（秒）
+    #[serde(default = "default_retry_interval_sec")]
+    pub retry_interval_sec: u64,
+}
+
+fn default_retry_count() -> u32 {
+    3
+}
+
+fn default_retry_interval_sec() -> u64 {
+    5
+}
+
+impl Default for PollingErrorHandlingConfig {
+    fn default() -> Self {
+        PollingErrorHandlingConfig {
+            retry_count: default_retry_count(),
+            retry_interval_sec: default_retry_interval_sec(),
+        }
+    }
+}
+
 /// 設定ファイルの構造体
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
@@ -12,6 +82,18 @@ pub struct Config {
     /// 通知表示時に通知を既読にするかどうか
     #[serde(default = "default_mark_as_read_on_notify")]
     pub mark_as_read_on_notify: bool,
+
+    /// 通知フィルタの設定
+    #[serde(default)]
+    pub notification_filters: NotificationFilter,
+
+    /// 通知バッチ処理の設定
+    #[serde(default)]
+    pub notification_batch_config: NotificationBatchConfig,
+
+    /// ポーリング処理のエラーハンドリング設定
+    #[serde(default)]
+    pub polling_error_handling_config: PollingErrorHandlingConfig,
 
     /// GitHub OAuth Client ID（省略可）
     #[serde(default = "default_client_id")]
@@ -37,6 +119,9 @@ impl Default for Config {
         Config {
             poll_interval_sec: default_poll_interval_sec(),
             mark_as_read_on_notify: default_mark_as_read_on_notify(),
+            notification_filters: NotificationFilter::default(),
+            notification_batch_config: NotificationBatchConfig::default(),
+            polling_error_handling_config: PollingErrorHandlingConfig::default(),
             client_id: default_client_id(),
         }
     }

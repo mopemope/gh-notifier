@@ -1,9 +1,10 @@
 ---
 id: task-9.4
 title: 通知既読処理（mark_as_read_on_notify）
-status: To Do
+status: Done
 assignee: []
 created_date: '2025-11-01 02:38'
+updated_date: '2025-11-01 08:11'
 labels:
   - poller
   - api

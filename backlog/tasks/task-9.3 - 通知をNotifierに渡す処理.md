@@ -1,7 +1,7 @@
 ---
 id: task-9.3
 title: 通知をNotifierに渡す処理
-status: To Do
+status: Done
 assignee: []
 created_date: '2025-11-01 02:38'
 labels:

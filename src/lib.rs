@@ -15,6 +15,6 @@ pub use models::{
     DeviceAuthResponse, ErrorResponse, Notification, NotificationRepository, NotificationSubject,
     TokenInfo, TokenResponse,
 };
-pub use poller::Poller;
+pub use poller::{DesktopNotifier, Poller};
 pub use polling::{filter_new_notifications, handle_notification, run_polling_loop};
 pub use state::{State, StateManager};
