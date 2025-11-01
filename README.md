@@ -11,6 +11,8 @@ Rustで構築された軽量デーモンアプリケーションで、GitHub通�
 - **自動トークン更新**: トークンの期限切れ時に自動的に更新します。
 - **低リソース使用**: CPUやメモリ消費が最小限の軽量デーモンです。
 - **クロスプラットフォーム**: Linux（GNOME/KDE）、macOS、Windows 10/11で動作。
+- **構成可能なポーリング**: 通知ポーリング間隔やフィルタリング設定が可能です。
+- **安全なシャットダウン**: SIGINT/SIGTERMシグナルによる安全な終了処理。
 
 ## アーキテクチャ
 
@@ -30,6 +32,9 @@ Rustで構築された軽量デーモンアプリケーションで、GitHub通�
 
 - Rust 1.75以上
 - ネイティブ通知およびキーチェーンアクセス用のシステム依存パッケージ
+  - Linux: libsecret-devel, libdbus-1-dev など
+  - macOS: システム通知が有効
+  - Windows: WinRT通知APIが利用可能
 
 ### ソースからのビルド
 
@@ -43,34 +48,86 @@ cargo build --release
 
 ## 使用方法
 
+### 初期設定と認証
+
 初回実行時に、GitHubのOAuth Device Flowを使用した認証プロンプトが表示されます：
 
-1. アプリケーションが認証コードとURLを表示します
-2. URLにアクセスし、コードを入力してGitHubアカウントで認証します
-3. アプリケーションを承認します
-4. アプリケーションがトークンを受信し、安全に保存します
+1. ターミナル上で `./target/release/gh-notifier` を実行
+2. アプリケーションが以下のように表示します：
+   ```
+   GitHub Notifier starting...
+   No existing token found, starting OAuth Device Flow...
+   No authentication token found. Starting authentication process...
+   ```
+3. GitHubから認証コードとURLが提供されます
+4. 指示に従ってWebブラウザでURLにアクセスし、コードを入力してGitHubアカウントで認証し、アプリケーションを承認します
+5. アプリケーションがトークンを受信し、OSのキーチェーンに安全に保存します
 
-認証後、デーモンはバックグラウンドで実行され、30秒ごとに（設定可能）GitHubから新規通知をポーリングします。
+### 実行
+
+```bash
+./target/release/gh-notifier
+```
+
+プログラムは認証が完了している場合、自動的にバックグラウンドで実行され、定期的にGitHub通知をポーリングします。
+
+### シャットダウン
+
+プログラムを終了するには `Ctrl+C` (SIGINT) または `SIGTERM` シグナルを送信します：
+
+```bash
+# Ctrl+C を使用して終了
+# または
+pkill -TERM gh-notifier
+```
+
+プログラムは受信したシグナルに応じて安全に終了し、状態を保存して終了します。
 
 ## 設定
 
 設定ファイルは以下の場所に保存されます：
-- Linux/macOS: `~/.config/gh-notify-daemon/config.toml`
-- Windows: `%APPDATA%\gh-notify-daemon\config.toml`
+- Linux/macOS: `~/.config/gh-notifier/config.toml`
+- Windows: `%APPDATA%\gh-notifier\config.toml`
 
 デフォルト設定：
 ```toml
-poll_interval_sec = 30  # ポーリング間隔（秒）
-mark_as_read_on_notify = false  # 通知表示時に既読にするか
-client_id = "Iv1.xxxxxxxxxxxxxxxx"  # GitHub OAuth App Client ID
+poll_interval_sec = 30                    # 通知ポーリング間隔（秒）
+mark_as_read_on_notify = false           # 通知表示時に既読にするか
+client_id = "Iv1.898a6d2a86c3f7aa"      # GitHub OAuth App Client ID
+log_level = "info"                       # ログレベル（info, debug, warn, error）
+
+# 通知フィルタリング設定の例
+[notification_filters]
+exclude_repositories = []                # 除外するリポジトリのリスト
+exclude_reasons = []                     # 除外する通知理由のリスト
+
+# 通知バッチ処理設定（バッチ処理を無効にするにはbatch_size = 0）
+[notification_batch_config]
+batch_size = 0                           # 通知バッチの最大数（0で無効）
+batch_interval_sec = 30                  # バッチ処理の間隔（秒）
+
+# ポーリングエラーハンドリング設定
+[polling_error_handling_config]
+retry_count = 3                          # エラー発生時の再試行回数
+retry_interval_sec = 5                   # 再試行間隔（秒）
 ```
+
+## 設定オプションの詳細
+
+- `poll_interval_sec`: GitHub APIから通知をポーリングする間隔（秒単位）。デフォルトは30秒。
+- `mark_as_read_on_notify`: trueにすると、通知表示時に自動的にGitHub上で通知を既読に設定します。
+- `log_level`: ログの詳細度（info, debug, warn, error）。デフォルトはinfo。
+- `client_id`: GitHub OAuthアプリケーションのクライアントID。デフォルトは組み込みのID。
+- `exclude_repositories`: 通知を受け取りたくないリポジトリのリスト。
+- `exclude_reasons`: 通知を受け取りたくない理由のリスト（例: "mention", "comment", "subscribed" など）。
 
 ## セキュリティ
 
 - トークンはOSキーチェーンに安全に保存されます
 - アクセストークンは期限切れ時に自動的に更新されます
 - トークンはログに出力されたり公開されたりすることはありません
-- ファイルパーミッションは安全に設定されています（600）
+- ファイルパーミッションは安全に設定されています
+- OAuth Device Flow認証により、個人用アクセストークンの手動作成が不要です
 
 ## 技術的詳細
 
@@ -78,6 +135,22 @@ client_id = "Iv1.xxxxxxxxxxxxxxxx"  # GitHub OAuth App Client ID
 - **認証スコープ**: 通知の読み取りに`notifications`スコープが必要、既読に設定する場合はオプションで`repo`スコープ
 - **ログ**: `tracing`クレートによる構造化ログ
 - **非同期ランタイム**: 非同期操作のためのTokioベース
+- **シャットダウン処理**: SIGINT/SIGTERMシグナルをキャッチして安全に終了するイベントループ
+- **タスク管理**: `tokio::spawn`を使用した非同期タスクの実行
+
+## トラブルシューティング
+
+### 認証に関する問題
+- 最初の認証時にGitHubで承認を拒否すると、再度OAuthフローを実行する必要があります
+- トークンの有効期限切れ時には、自動的に再認証プロセスが開始されます
+
+### 通知に関する問題
+- 通知が表示されない場合は、OSの通知設定が有効であることを確認してください
+- 通知の頻度を調整するには、設定ファイルで`poll_interval_sec`を変更してください
+
+### ログの確認
+- `log_level`を`debug`に設定すると、より詳細なログを確認できます
+- ログは標準出力に構造化形式で表示されます
 
 ## ライセンス
 
