@@ -361,13 +361,14 @@ impl AuthManager {
     /// Checks if the refresh token has expired
     pub fn is_refresh_token_expired(&self) -> bool {
         if let Some(ref token_info) = self.token_info
-            && let Some(refresh_expires_at) = token_info.refresh_token_expires_at {
-                let now = SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap()
-                    .as_secs();
-                return now >= refresh_expires_at;
-            }
+            && let Some(refresh_expires_at) = token_info.refresh_token_expires_at
+        {
+            let now = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs();
+            return now >= refresh_expires_at;
+        }
         // If there's no refresh token or expiration, assume it's expired
         self.token_info
             .as_ref()
