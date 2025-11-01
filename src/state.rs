@@ -80,7 +80,6 @@ impl StateManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs;
     use tempfile::NamedTempFile;
 
     #[test]
@@ -156,7 +155,10 @@ mod tests {
         };
         let timestamp = "2023-01-01T00:00:00Z".to_string();
         state_manager.update_last_checked_at(timestamp.clone());
-        assert_eq!(state_manager.get_last_checked_at(), Some(timestamp.as_str()));
+        assert_eq!(
+            state_manager.get_last_checked_at(),
+            Some(timestamp.as_str())
+        );
     }
 
     #[test]

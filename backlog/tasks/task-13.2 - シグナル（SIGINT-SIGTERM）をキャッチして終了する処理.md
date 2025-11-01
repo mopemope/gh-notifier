@@ -1,9 +1,10 @@
 ---
 id: task-13.2
 title: シグナル（SIGINT/SIGTERM）をキャッチして終了する処理
-status: To Do
+status: Done
 assignee: []
 created_date: '2025-11-01 02:39'
+updated_date: '2025-11-01 09:15'
 labels:
   - main
   - signal

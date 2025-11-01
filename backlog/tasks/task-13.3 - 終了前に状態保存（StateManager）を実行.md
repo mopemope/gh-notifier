@@ -1,9 +1,10 @@
 ---
 id: task-13.3
 title: 終了前に状態保存（StateManager）を実行
-status: To Do
+status: Done
 assignee: []
 created_date: '2025-11-01 02:39'
+updated_date: '2025-11-01 09:17'
 labels:
   - main
   - state

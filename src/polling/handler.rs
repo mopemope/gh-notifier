@@ -7,7 +7,7 @@ pub async fn handle_notification(
     notifier: &dyn Notifier,
     github_client: &mut GitHubClient,
     mark_as_read_on_notify: bool,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let title = format!(
         "{} / {}",
         notification.repository.full_name, notification.subject.kind
@@ -43,7 +43,7 @@ mod tests {
             _title: &str,
             _body: &str,
             _url: &str,
-        ) -> Result<(), Box<dyn std::error::Error>> {
+        ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             Ok(())
         }
     }

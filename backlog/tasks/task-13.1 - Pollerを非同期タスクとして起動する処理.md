@@ -1,9 +1,10 @@
 ---
 id: task-13.1
 title: Pollerを非同期タスクとして起動する処理
-status: To Do
+status: Done
 assignee: []
 created_date: '2025-11-01 02:39'
+updated_date: '2025-11-01 09:14'
 labels:
   - main
   - poller

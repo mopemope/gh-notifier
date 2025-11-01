@@ -5,3 +5,4 @@ pub mod runner;
 pub use filter::filter_new_notifications;
 pub use handler::handle_notification;
 pub use runner::run_polling_loop;
+pub use runner::run_polling_loop_with_shutdown;

@@ -7,7 +7,7 @@ pub trait Notifier: Send + Sync {
         title: &str,
         body: &str,
         url: &str,
-    ) -> Result<(), Box<dyn std::error::Error>>;
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>>;
 }
 
 pub struct Poller {
@@ -33,12 +33,27 @@ impl Poller {
     }
 
     /// ポーリングを実行する非同期ループ
-    pub async fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn run(&mut self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         crate::polling::run_polling_loop(
             &self.config,
             &mut self.github_client,
             &mut self.state_manager,
             self.notifier.as_ref(),
+        )
+        .await
+    }
+
+    /// シャットダウンシグナル付きでポーリングを実行する非同期ループ
+    pub async fn run_with_shutdown(
+        &mut self,
+        mut shutdown_rx: tokio::sync::broadcast::Receiver<()>,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        crate::polling::run_polling_loop_with_shutdown(
+            &self.config,
+            &mut self.github_client,
+            &mut self.state_manager,
+            self.notifier.as_ref(),
+            &mut shutdown_rx,
         )
         .await
     }
@@ -52,13 +67,16 @@ impl Notifier for DesktopNotifier {
         title: &str,
         body: &str,
         url: &str, // url を使用する
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         Notification::new()
             .summary(title)
             .body(body)
             .icon("dialog-information") // 任意のアイコン
             .hint(notify_rust::Hint::Transient(true)) // 通知を自動的に消す
-            .hint(notify_rust::Hint::Custom("default-action".to_string(), url.to_string()))
+            .hint(notify_rust::Hint::Custom(
+                "default-action".to_string(),
+                url.to_string(),
+            ))
             .show()
             .map_err(|e| Box::new(std::io::Error::other(e)))?;
         Ok(())
@@ -75,14 +93,9 @@ impl Notifier for MacNotifier {
         title: &str,
         body: &str,
         _url: &str, // url は使用していないので、アンダースコア接頭辞を付ける
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         mac_notification_sys::set_application(&"gh-notifier")?;
-        mac_notification_sys::send_notification(
-            &title,
-            &Some(&body),
-            &"",
-            &None,
-        )?;
+        mac_notification_sys::send_notification(&title, &Some(&body), &"", &None)?;
         Ok(())
     }
 }
@@ -97,7 +110,7 @@ impl Notifier for WindowsNotifier {
         title: &str,
         body: &str,
         url: &str, // url を使用する
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         use winrt_notification::Toast;
 
         Toast::new(Toast::POWERSHELL_APP_ID)
@@ -112,6 +125,7 @@ impl Notifier for WindowsNotifier {
     }
 }
 
+#[allow(dead_code)]
 struct DummyNotifier;
 
 impl Notifier for DummyNotifier {
@@ -120,7 +134,7 @@ impl Notifier for DummyNotifier {
         title: &str,
         body: &str,
         url: &str,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         println!("Notification: {} - {} (URL: {})", title, body, url);
         Ok(())
     }
@@ -130,6 +144,20 @@ impl Notifier for DummyNotifier {
 mod tests {
     use super::*;
     use crate::{AuthManager, Notification, NotificationRepository, NotificationSubject};
+
+    struct DummyNotifier;
+
+    impl Notifier for DummyNotifier {
+        fn send_notification(
+            &self,
+            title: &str,
+            body: &str,
+            url: &str,
+        ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+            println!("Notification: {} - {} (URL: {})", title, body, url);
+            Ok(())
+        }
+    }
 
     #[tokio::test]
     #[ignore] // 認証トークンがないとテストできないため

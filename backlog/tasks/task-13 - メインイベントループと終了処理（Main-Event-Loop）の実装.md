@@ -1,9 +1,10 @@
 ---
 id: task-13
 title: メインイベントループと終了処理（Main Event Loop）の実装
-status: To Do
+status: Done
 assignee: []
 created_date: '2025-11-01 02:34'
+updated_date: '2025-11-01 09:07'
 labels:
   - main
   - implementation
