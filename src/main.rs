@@ -14,7 +14,6 @@ async fn main() -> Result<(), AuthError> {
     });
 
     // Set up file logging first so we can log setup process
-    #[allow(unused_variables)]
     let (file_writer, guard) = create_file_logger(&config.log_file_path);
 
     // Initialize tracing logger with level from config
@@ -30,6 +29,9 @@ async fn main() -> Result<(), AuthError> {
     tracing::subscriber::set_global_default(subscriber)
         .expect("Failed to set global tracing subscriber");
 
+    // Keep the guard alive to ensure log messages are flushed
+    let _guard = guard;
+
     tracing::info!("GitHub Notifier starting...");
 
     let mut auth_manager = AuthManager::new()?;
@@ -43,9 +45,21 @@ async fn main() -> Result<(), AuthError> {
         match auth_manager.get_valid_token_with_reauth().await {
             Ok(_) => {
                 tracing::info!("Token is valid and ready for use");
+                println!("Token is valid and ready for use. The application is now running in the background.");
+                println!("It will continuously check GitHub for new notifications.");
+                println!("Press Ctrl+C to stop the application.");
             }
             Err(e) => {
                 tracing::error!("Failed to get valid token: {}", e);
+                eprintln!(
+                    "Failed to validate existing token. This may be due to an invalid or unconfigured GitHub OAuth client ID."
+                );
+                eprintln!(
+                    "The existing token may be invalid, or the client ID may need to be updated."
+                );
+                eprintln!(
+                    "Please check your configuration and ensure you have a valid client_id set."
+                );
                 std::process::exit(1);
             }
         }
@@ -55,9 +69,21 @@ async fn main() -> Result<(), AuthError> {
         match auth_manager.get_valid_token_with_reauth().await {
             Ok(_) => {
                 tracing::info!("Authentication successful!");
+                println!("Authentication successful! The application is now running in the background.");
+                println!("It will continuously check GitHub for new notifications.");
+                println!("Press Ctrl+C to stop the application.");
             }
             Err(e) => {
                 tracing::error!("Authentication failed: {}", e);
+                eprintln!(
+                    "Authentication failed. This may be due to an invalid or unconfigured GitHub OAuth client ID."
+                );
+                eprintln!(
+                    "Please ensure you have a valid client_id configured in your config file."
+                );
+                eprintln!(
+                    "To configure your own client ID, register a GitHub OAuth App and set the 'client_id' in the config file."
+                );
                 std::process::exit(1);
             }
         }

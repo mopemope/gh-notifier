@@ -17,9 +17,16 @@ pub struct AuthManager {
 impl AuthManager {
     /// Creates a new AuthManager instance
     pub fn new() -> Result<Self, AuthError> {
-        let keychain_entry = Entry::new("gh-notifier", "github_auth_token")
-            .map(Arc::new)
-            .ok();
+        let keychain_entry = match Entry::new("gh-notifier", "github_auth_token") {
+            Ok(entry) => Some(Arc::new(entry)),
+            Err(e) => {
+                tracing::warn!(
+                    "Keyring is not available on this system ({}), tokens will not persist between sessions.",
+                    e
+                );
+                None
+            }
+        };
 
         // Load the config to get the client ID
         let config = crate::config::load_config()
@@ -52,10 +59,21 @@ impl AuthManager {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await?;
-            return Err(AuthError::GeneralError(format!(
-                "Device authorization request failed: {} - {}",
-                status, error_text
-            )));
+
+            // Check if this is a 404 error which usually indicates an invalid client_id
+            if status.as_u16() == 404 {
+                return Err(AuthError::GeneralError(format!(
+                    "Device authorization request failed: Invalid client_id. Status: {} - {} \n\
+                    This usually means the GitHub OAuth client_id is invalid or not registered for device flow. \n\
+                    Please register your own GitHub OAuth App and set the correct client_id in the config file.",
+                    status, error_text
+                )));
+            } else {
+                return Err(AuthError::GeneralError(format!(
+                    "Device authorization request failed: {} - {}",
+                    status, error_text
+                )));
+            }
         }
 
         // Get response text to see what we're actually getting
@@ -86,13 +104,12 @@ impl AuthManager {
         let timeout_duration = std::time::Duration::from_secs(device_response.expires_in);
 
         // Poll until we get the token, the device code expires, or an error occurs
+        // First request happens immediately after user sees the instructions
         loop {
             // Check if we've exceeded the timeout
             if start_time.elapsed() >= timeout_duration {
                 return Err(AuthError::AuthorizationTimeout);
             }
-
-            tokio::time::sleep(tokio::time::Duration::from_secs(device_response.interval)).await;
 
             let token_response = client
                 .post(GITHUB_TOKEN_URL)
@@ -118,6 +135,8 @@ impl AuthManager {
                 match error_response.error.as_str() {
                     "authorization_pending" => {
                         // Continue polling, user hasn't authorized yet
+                        // Sleep for the polling interval before the next check
+                        tokio::time::sleep(tokio::time::Duration::from_secs(device_response.interval)).await;
                         continue;
                     }
                     "slow_down" => {
@@ -165,10 +184,10 @@ impl AuthManager {
                         // Default expiration time (GitHub tokens typically expire in 1 hour by default)
                         Some(
                             std::time::SystemTime::now()
-                                .duration_since(std::time::UNIX_EPOCH)
-                                .unwrap()
-                                .as_secs()
-                                + 3600, // 1 hour in seconds
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap()
+                            .as_secs()
+                            + 3600, // 1 hour in seconds
                         )
                     });
 
@@ -311,58 +330,102 @@ impl AuthManager {
 
     /// Loads the token from the OS keychain
     pub fn load_token_from_keychain(&mut self) -> Result<Option<TokenInfo>, AuthError> {
-        if let Some(ref entry) = self.keychain_entry {
-            match entry.get_password() {
-                Ok(token_json) => {
-                    if !token_json.is_empty() {
-                        let token_info: TokenInfo = serde_json::from_str(&token_json)?;
-                        self.token_info = Some(token_info.clone());
-                        Ok(Some(token_info))
-                    } else {
+        match &self.keychain_entry {
+            Some(entry) => {
+                match entry.get_password() {
+                    Ok(token_json) => {
+                        if !token_json.is_empty() {
+                            match serde_json::from_str::<TokenInfo>(&token_json) {
+                                Ok(token_info) => {
+                                    tracing::debug!("Token successfully loaded from keychain");
+                                    self.token_info = Some(token_info.clone());
+                                    Ok(Some(token_info))
+                                }
+                                Err(e) => {
+                                    tracing::error!(
+                                        "Failed to deserialize token from keychain: {:?}",
+                                        e
+                                    );
+                                    Err(AuthError::GeneralError(format!(
+                                        "Failed to deserialize token: {}",
+                                        e
+                                    )))
+                                }
+                            }
+                        } else {
+                            tracing::debug!("No token found in keychain");
+                            Ok(None)
+                        }
+                    }
+                    Err(keyring::Error::NoEntry) => {
+                        tracing::debug!("No token entry found in keychain");
+                        Ok(None)
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to read token from keychain: {:?}", e);
+                        // Return None if we can't read from keychain, but log the error
                         Ok(None)
                     }
                 }
-                Err(_) => Ok(None), // If no password is found, return None
             }
-        } else {
-            Ok(None)
+            None => {
+                tracing::warn!("Cannot load token: keychain entry not initialized");
+                Ok(None)
+            }
         }
     }
 
     /// Saves the token to the OS keychain
     pub fn save_token_to_keychain(&self, token_info: &TokenInfo) -> Result<(), AuthError> {
-        if let Some(ref entry) = self.keychain_entry {
-            let token_json = serde_json::to_string(token_info)?;
-            entry.set_password(&token_json)?;
-            Ok(())
-        } else {
-            Err(AuthError::GeneralError(
-                "Keychain entry not initialized".to_string(),
-            ))
+        match &self.keychain_entry {
+            Some(entry) => {
+                let token_json = serde_json::to_string(token_info)?;
+                entry.set_password(&token_json).map_err(|e| {
+                    tracing::error!("Failed to save token to keychain: {:?}", e);
+                    AuthError::KeyringError(e)
+                })?;
+                tracing::debug!("Token successfully saved to keychain");
+                Ok(())
+            }
+            None => {
+                tracing::warn!("Cannot save token: keychain entry not initialized");
+                Err(AuthError::GeneralError(
+                    "Keychain entry not initialized".to_string(),
+                ))
+            }
         }
     }
 
     /// Deletes the token from the OS keychain
     pub fn delete_token_from_keychain(&mut self) -> Result<(), AuthError> {
-        if let Some(ref entry) = self.keychain_entry {
-            match entry.delete_password() {
-                Ok(()) => {
-                    // Clear the in-memory token info as well
-                    self.token_info = None;
-                    Ok(())
+        match &self.keychain_entry {
+            Some(entry) => {
+                match entry.delete_password() {
+                    Ok(()) => {
+                        tracing::debug!("Token successfully deleted from keychain");
+                        // Clear the in-memory token info as well
+                        self.token_info = None;
+                        Ok(())
+                    }
+                    Err(keyring::Error::NoEntry) => {
+                        tracing::debug!("No token entry found to delete from keychain");
+                        // If the item doesn't exist, that's not really an error from the user's perspective
+                        // Still clear the in-memory token info if it exists
+                        self.token_info = None;
+                        Ok(())
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to delete token from keychain: {:?}", e);
+                        Err(AuthError::KeyringError(e))
+                    }
                 }
-                Err(keyring::Error::NoEntry) => {
-                    // If the item doesn't exist, that's not really an error from the user's perspective
-                    // Still clear the in-memory token info if it exists
-                    self.token_info = None;
-                    Ok(())
-                }
-                Err(e) => Err(AuthError::KeyringError(e)),
             }
-        } else {
-            Err(AuthError::GeneralError(
-                "Keychain entry not initialized".to_string(),
-            ))
+            None => {
+                tracing::warn!("Cannot delete token: keychain entry not initialized");
+                Err(AuthError::GeneralError(
+                    "Keychain entry not initialized".to_string(),
+                ))
+            }
         }
     }
 
@@ -374,12 +437,16 @@ impl AuthManager {
                     .duration_since(UNIX_EPOCH)
                     .unwrap()
                     .as_secs();
-                return now >= expires_at;
+                let expired = now >= expires_at;
+                tracing::debug!("Token expiration check: now={}, expires_at={}, expired={}", now, expires_at, expired);
+                return expired;
             }
             // If token exists but has no expiration time, assume it doesn't expire
+            tracing::debug!("Token has no expiration time, assuming not expired");
             return false;
         }
         // If there's no token at all, it's considered expired
+        tracing::debug!("No token available, considering expired");
         true
     }
 
@@ -393,12 +460,17 @@ impl AuthManager {
                     .as_secs();
 
                 // Check if the token will expire within the specified time window
-                return now + within_seconds >= expires_at;
+                let expiring_soon = now + within_seconds >= expires_at;
+                tracing::debug!("Token expiring soon check: now={}, expires_at={}, within_seconds={}, expiring_soon={}", 
+                               now, expires_at, within_seconds, expiring_soon);
+                return expiring_soon;
             }
             // If token exists but has no expiration time, it won't expire soon
+            tracing::debug!("Token has no expiration time, assuming not expiring soon");
             return false;
         }
         // If there's no token at all, then it's expiring soon (meaning we need to get one)
+        tracing::debug!("No token available, considering expiring soon");
         true
     }
 
@@ -534,10 +606,20 @@ impl AuthManager {
                 .send()
                 .await?;
 
-            // If we get a 200 OK, the token is valid
-            Ok(response.status().is_success())
+            let status = response.status();
+            tracing::debug!("Token validation response status: {}", status);
+            
+            if status.is_success() {
+                tracing::debug!("Token validation successful");
+                Ok(true)
+            } else {
+                tracing::debug!("Token validation failed with status: {}", status);
+                // Don't treat non-200 responses as errors, just as invalid token
+                Ok(false)
+            }
         } else {
             // No token to validate
+            tracing::debug!("No token to validate");
             Ok(false)
         }
     }
