@@ -136,7 +136,10 @@ impl AuthManager {
                     "authorization_pending" => {
                         // Continue polling, user hasn't authorized yet
                         // Sleep for the polling interval before the next check
-                        tokio::time::sleep(tokio::time::Duration::from_secs(device_response.interval)).await;
+                        tokio::time::sleep(tokio::time::Duration::from_secs(
+                            device_response.interval,
+                        ))
+                        .await;
                         continue;
                     }
                     "slow_down" => {
@@ -184,10 +187,10 @@ impl AuthManager {
                         // Default expiration time (GitHub tokens typically expire in 1 hour by default)
                         Some(
                             std::time::SystemTime::now()
-                            .duration_since(std::time::UNIX_EPOCH)
-                            .unwrap()
-                            .as_secs()
-                            + 3600, // 1 hour in seconds
+                                .duration_since(std::time::UNIX_EPOCH)
+                                .unwrap()
+                                .as_secs()
+                                + 3600, // 1 hour in seconds
                         )
                     });
 
@@ -362,8 +365,9 @@ impl AuthManager {
                         Ok(None)
                     }
                     Err(e) => {
-                        tracing::error!("Failed to read token from keychain: {:?}", e);
-                        // Return None if we can't read from keychain, but log the error
+                        // Log the specific error but return Ok(None) to allow the application to continue
+                        // This handles cases where keyring is available during initialization but not during operations
+                        tracing::warn!("Failed to read token from keychain: {:?}. Tokens will not be loaded from keychain.", e);
                         Ok(None)
                     }
                 }
@@ -380,18 +384,24 @@ impl AuthManager {
         match &self.keychain_entry {
             Some(entry) => {
                 let token_json = serde_json::to_string(token_info)?;
-                entry.set_password(&token_json).map_err(|e| {
-                    tracing::error!("Failed to save token to keychain: {:?}", e);
-                    AuthError::KeyringError(e)
-                })?;
-                tracing::debug!("Token successfully saved to keychain");
-                Ok(())
+                match entry.set_password(&token_json) {
+                    Ok(()) => {
+                        tracing::debug!("Token successfully saved to keychain");
+                        Ok(())
+                    }
+                    Err(e) => {
+                        // Log the specific error but return Ok(()) to allow the application to continue
+                        // This handles cases where keyring is available during initialization but not during operations
+                        tracing::warn!("Failed to save token to keychain: {:?}. Tokens will not persist between sessions.", e);
+                        Ok(())
+                    }
+                }
             }
             None => {
                 tracing::warn!("Cannot save token: keychain entry not initialized");
-                Err(AuthError::GeneralError(
-                    "Keychain entry not initialized".to_string(),
-                ))
+                // If there's no keychain entry, we return Ok to allow the application to continue
+                // Tokens just won't persist between sessions
+                Ok(())
             }
         }
     }
@@ -415,16 +425,21 @@ impl AuthManager {
                         Ok(())
                     }
                     Err(e) => {
-                        tracing::error!("Failed to delete token from keychain: {:?}", e);
-                        Err(AuthError::KeyringError(e))
+                        // Log the specific error but return Ok(()) to allow the application to continue
+                        // This handles cases where keyring is available during initialization but not during operations
+                        tracing::warn!("Failed to delete token from keychain: {:?}.", e);
+                        // Still clear the in-memory token info if it exists
+                        self.token_info = None;
+                        Ok(())
                     }
                 }
             }
             None => {
                 tracing::warn!("Cannot delete token: keychain entry not initialized");
-                Err(AuthError::GeneralError(
-                    "Keychain entry not initialized".to_string(),
-                ))
+                // If there's no keychain entry, we return Ok to allow the application to continue
+                // Just clear the in-memory token info
+                self.token_info = None;
+                Ok(())
             }
         }
     }
@@ -438,7 +453,12 @@ impl AuthManager {
                     .unwrap()
                     .as_secs();
                 let expired = now >= expires_at;
-                tracing::debug!("Token expiration check: now={}, expires_at={}, expired={}", now, expires_at, expired);
+                tracing::debug!(
+                    "Token expiration check: now={}, expires_at={}, expired={}",
+                    now,
+                    expires_at,
+                    expired
+                );
                 return expired;
             }
             // If token exists but has no expiration time, assume it doesn't expire
@@ -461,8 +481,13 @@ impl AuthManager {
 
                 // Check if the token will expire within the specified time window
                 let expiring_soon = now + within_seconds >= expires_at;
-                tracing::debug!("Token expiring soon check: now={}, expires_at={}, within_seconds={}, expiring_soon={}", 
-                               now, expires_at, within_seconds, expiring_soon);
+                tracing::debug!(
+                    "Token expiring soon check: now={}, expires_at={}, within_seconds={}, expiring_soon={}",
+                    now,
+                    expires_at,
+                    within_seconds,
+                    expiring_soon
+                );
                 return expiring_soon;
             }
             // If token exists but has no expiration time, it won't expire soon
@@ -608,7 +633,7 @@ impl AuthManager {
 
             let status = response.status();
             tracing::debug!("Token validation response status: {}", status);
-            
+
             if status.is_success() {
                 tracing::debug!("Token validation successful");
                 Ok(true)
@@ -1134,7 +1159,8 @@ mod tests {
             keychain_entry: None, // No keychain entry for this test
         };
 
-        // Test that operations fail gracefully when keychain entry is not initialized
+        // Test that operations succeed gracefully when keychain entry is not initialized
+        // (tokens just won't persist between sessions)
         let token = TokenInfo {
             access_token: SecretString::new("test_token".to_string()),
             token_type: "Bearer".to_string(),
@@ -1144,7 +1170,7 @@ mod tests {
         };
 
         let result = auth_manager.save_token_to_keychain(&token);
-        assert!(result.is_err());
+        assert!(result.is_ok()); // Should succeed even when there's no keychain
     }
 
     #[tokio::test]

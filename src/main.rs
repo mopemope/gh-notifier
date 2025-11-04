@@ -45,7 +45,9 @@ async fn main() -> Result<(), AuthError> {
         match auth_manager.get_valid_token_with_reauth().await {
             Ok(_) => {
                 tracing::info!("Token is valid and ready for use");
-                println!("Token is valid and ready for use. The application is now running in the background.");
+                println!(
+                    "Token is valid and ready for use. The application is now running in the background."
+                );
                 println!("It will continuously check GitHub for new notifications.");
                 println!("Press Ctrl+C to stop the application.");
             }
@@ -69,7 +71,9 @@ async fn main() -> Result<(), AuthError> {
         match auth_manager.get_valid_token_with_reauth().await {
             Ok(_) => {
                 tracing::info!("Authentication successful!");
-                println!("Authentication successful! The application is now running in the background.");
+                println!(
+                    "Authentication successful! The application is now running in the background."
+                );
                 println!("It will continuously check GitHub for new notifications.");
                 println!("Press Ctrl+C to stop the application.");
             }
