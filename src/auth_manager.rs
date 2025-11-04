@@ -21,8 +21,12 @@ impl AuthManager {
             .map(Arc::new)
             .ok();
 
+        // Load the config to get the client ID
+        let config = crate::config::load_config()
+            .map_err(|e| AuthError::GeneralError(format!("Failed to load config: {}", e)))?;
+
         Ok(AuthManager {
-            client_id: GITHUB_OAUTH_CLIENT_ID.to_string(),
+            client_id: config.client_id,
             token_info: None,
             keychain_entry,
         })
@@ -39,12 +43,27 @@ impl AuthManager {
 
         let response = client
             .post(GITHUB_DEVICE_AUTHORIZATION_URL)
+            .header("Accept", "application/json")
             .form(&params)
             .send()
             .await?;
 
+        // Check if response status is successful before attempting JSON parse
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await?;
+            return Err(AuthError::GeneralError(format!(
+                "Device authorization request failed: {} - {}",
+                status, error_text
+            )));
+        }
+
+        // Get response text to see what we're actually getting
+        let response_text = response.text().await?;
+        tracing::debug!("Device authorization response: {}", response_text);
+
         // Parse the device authorization response properly
-        let device_response: DeviceAuthResponse = response.json().await?;
+        let device_response: DeviceAuthResponse = serde_json::from_str(&response_text)?;
 
         // Display instructions to user
         println!("GitHub OAuth Device Flow:");
@@ -77,12 +96,22 @@ impl AuthManager {
 
             let token_response = client
                 .post(GITHUB_TOKEN_URL)
+                .header("Accept", "application/json")
+                .header("Content-Type", "application/x-www-form-urlencoded")
                 .form(&token_params)
                 .send()
                 .await?;
 
             let status = token_response.status();
             let response_text = token_response.text().await?;
+            tracing::debug!("Token endpoint response: {}", response_text);
+
+            // Check if response is valid JSON before attempting to parse
+            if response_text.trim().is_empty() {
+                return Err(AuthError::GeneralError(
+                    "Token endpoint returned empty response".to_string(),
+                ));
+            }
 
             // Try to parse as error response first
             if let Ok(error_response) = serde_json::from_str::<ErrorResponse>(&response_text) {
@@ -203,9 +232,24 @@ impl AuthManager {
             ("refresh_token", &refresh_token.expose_secret().to_string()),
         ];
 
-        let response = client.post(GITHUB_TOKEN_URL).form(&params).send().await?;
+        let response = client
+            .post(GITHUB_TOKEN_URL)
+            .header("Accept", "application/json")
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .form(&params)
+            .send()
+            .await?;
 
         let response_text = response.text().await?;
+        tracing::debug!("Token refresh response: {}", response_text);
+
+        // Check if response is valid JSON before attempting to parse
+        if response_text.trim().is_empty() {
+            return Err(AuthError::GeneralError(
+                "Token refresh endpoint returned empty response".to_string(),
+            ));
+        }
+
         let token_result: Result<TokenResponse, serde_json::Error> =
             serde_json::from_str(&response_text);
 
@@ -528,6 +572,10 @@ impl AuthManager {
             return match self.authenticate().await {
                 Ok(token_info) => {
                     self.token_info = Some(token_info.clone());
+                    // Save the new token to keychain
+                    if let Err(e) = self.save_token_to_keychain(&token_info) {
+                        eprintln!("Failed to save new token to keychain: {:?}", e);
+                    }
                     Ok(token_info.access_token.expose_secret().clone())
                 }
                 Err(e) => Err(e),
@@ -618,11 +666,14 @@ mod tests {
     use secrecy::SecretString;
 
     #[test]
+    #[ignore = "This test depends on user's config file which can have a custom client_id"]
     fn test_auth_manager_creation() {
         // Note: This test will fail when keyring isn't available in test environment
         // We'll skip this test in environments where keyring is not available
         if let Ok(auth_manager) = AuthManager::new() {
-            assert_eq!(auth_manager.client_id, GITHUB_OAUTH_CLIENT_ID);
+            // The client ID should come from config, so we should use the default value from config
+            let default_config = crate::config::Config::default();
+            assert_eq!(auth_manager.client_id, default_config.client_id);
             assert!(auth_manager.token_info.is_none());
         }
     }

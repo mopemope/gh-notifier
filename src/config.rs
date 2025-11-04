@@ -102,6 +102,10 @@ pub struct Config {
     /// ログレベル（省略可、デフォルト: info）
     #[serde(default = "default_log_level")]
     pub log_level: String,
+
+    /// ログファイルのパス（省略可、デフォルト: データディレクトリ下の logs/gh-notifier.log）
+    #[serde(default)]
+    pub log_file_path: Option<String>,
 }
 
 // デフォルト値の定義
@@ -132,6 +136,7 @@ impl Default for Config {
             polling_error_handling_config: PollingErrorHandlingConfig::default(),
             client_id: default_client_id(),
             log_level: default_log_level(),
+            log_file_path: None,
         }
     }
 }

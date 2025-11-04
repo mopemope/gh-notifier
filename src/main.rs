@@ -1,6 +1,8 @@
 use gh_notifier::config::load_config;
 use gh_notifier::{AuthError, GitHubClient, Poller, StateManager, auth_manager::AuthManager};
 use tokio::signal;
+use tracing_appender::non_blocking::NonBlocking;
+use tracing_appender::rolling::RollingFileAppender;
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
 #[tokio::main]
@@ -11,6 +13,10 @@ async fn main() -> Result<(), AuthError> {
         std::process::exit(1);
     });
 
+    // Set up file logging first so we can log setup process
+    #[allow(unused_variables)]
+    let (file_writer, guard) = create_file_logger(&config.log_file_path);
+
     // Initialize tracing logger with level from config
     let log_level = &config.log_level;
     let env_filter =
@@ -18,6 +24,7 @@ async fn main() -> Result<(), AuthError> {
 
     let subscriber = FmtSubscriber::builder()
         .with_env_filter(env_filter)
+        .with_writer(file_writer) // Log to file
         .finish();
 
     tracing::subscriber::set_global_default(subscriber)
@@ -102,6 +109,56 @@ async fn main() -> Result<(), AuthError> {
 
     tracing::info!("GitHub Notifier shutdown complete");
     Ok(())
+}
+
+// Create file logger
+fn create_file_logger(
+    log_file_path: &Option<String>,
+) -> (NonBlocking, tracing_appender::non_blocking::WorkerGuard) {
+    // Determine the log file path and whether to use rolling or simple appender
+    if let Some(path) = log_file_path {
+        let log_path = std::path::PathBuf::from(path);
+        let log_dir = log_path
+            .parent()
+            .map(|p| p.to_path_buf())
+            .unwrap_or_else(|| {
+                dirs::data_local_dir()
+                    .unwrap_or_else(|| {
+                        std::env::current_dir().expect("Current directory not accessible")
+                    })
+                    .join("gh-notifier")
+                    .join("logs")
+            });
+
+        // Create the directory if it doesn't exist
+        std::fs::create_dir_all(&log_dir).expect("Failed to create log directory");
+
+        let log_file_name = log_path
+            .file_name()
+            .unwrap_or(std::ffi::OsStr::new("gh-notifier.log"));
+
+        // For custom paths, we'll use a simple file appender (no rotation) since rotation with custom paths
+        // can be more complex - we'll use a non-rotating file appender
+        let file_appender = tracing_appender::rolling::never(&log_dir, log_file_name);
+        tracing_appender::non_blocking(file_appender)
+    } else {
+        // Use default location with daily rotation
+        let default_log_dir = dirs::data_local_dir()
+            .unwrap_or_else(|| std::env::current_dir().expect("Current directory not accessible"))
+            .join("gh-notifier")
+            .join("logs");
+
+        // Create the default log directory if it doesn't exist
+        std::fs::create_dir_all(&default_log_dir).expect("Failed to create log directory");
+
+        let file_appender = RollingFileAppender::new(
+            tracing_appender::rolling::Rotation::DAILY,
+            default_log_dir,
+            "gh-notifier.log",
+        );
+
+        tracing_appender::non_blocking(file_appender)
+    }
 }
 
 // Wait for a shutdown signal

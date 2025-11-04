@@ -89,6 +89,16 @@ impl GitHubClient {
             )))
         }
     }
+
+    /// Get a mutable reference to the auth manager to allow external operations like token saving
+    pub fn auth_manager_mut(&mut self) -> &mut AuthManager {
+        &mut self.auth_manager
+    }
+
+    /// Get a reference to the auth manager
+    pub fn auth_manager(&self) -> &AuthManager {
+        &self.auth_manager
+    }
 }
 
 #[cfg(test)]
