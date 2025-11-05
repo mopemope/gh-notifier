@@ -559,7 +559,17 @@ impl AuthManager {
     /// This is useful to determine if a token is actually valid or if re-auth is needed
     pub async fn validate_token(&self) -> Result<bool, AuthError> {
         if let Some(ref token_info) = self.token_info {
-            let client = reqwest::Client::new();
+            // First, check if token is expired before making network call
+            if self.is_access_token_expired() {
+                tracing::debug!("Token validation failed: token is expired");
+                return Ok(false);
+            }
+            
+            let client = reqwest::Client::builder()
+                .user_agent(format!("gh-notifier/{}", env!("CARGO_PKG_VERSION")))
+                .build()
+                .map_err(|e| AuthError::GeneralError(format!("Failed to create HTTP client: {}", e)))?;
+                
             let response = client
                 .get("https://api.github.com/user")
                 .header(
@@ -567,7 +577,13 @@ impl AuthManager {
                     format!("token {}", token_info.access_token.expose_secret()),
                 )
                 .send()
-                .await?;
+                .await
+                .map_err(|e| {
+                    tracing::warn!("Token validation request failed: {}", e);
+                    // Don't treat network errors as token invalidation
+                    // Instead, return the error so the caller can handle it appropriately
+                    AuthError::GeneralError(format!("Network error during token validation: {}", e))
+                })?;
 
             let status = response.status();
             tracing::debug!("Token validation response status: {}", status);
@@ -681,27 +697,91 @@ impl AuthManager {
                     }
                 }
                 Err(validation_error) => {
-                    // Validation failed due to network or other issues, try refresh first
-                    println!(
-                        "Token validation failed: {:?}. Attempting refresh...",
-                        validation_error
-                    );
-                    match self.maybe_refresh_token().await {
-                        Ok(token_info) => {
-                            self.token_info = Some(token_info.clone());
-                            Ok(token_info.access_token.expose_secret().clone())
+                    // Validation failed due to network or other issues
+                    // Check if it's a network error by matching against the error type
+                    match &validation_error {
+                        AuthError::RequestError(_) => {
+                            // This is likely a network connectivity issue, not a token issue
+                            println!("Token validation failed due to network issues. Checking if current token is still valid...");
+                            
+                            // Check if token is still valid based on expiration time only
+                            if !self.is_access_token_expired() {
+                                // Current token is still valid based on expiration, return it despite network validation failure
+                                if let Some(token_info) = &self.token_info {
+                                    println!("Network issues encountered, but current token is still valid. Continuing with current token.");
+                                    Ok(token_info.access_token.expose_secret().clone())
+                                } else {
+                                    // This shouldn't happen, but just in case
+                                    Err(validation_error)
+                                }
+                            } else {
+                                // Token is expired and validation failed due to network issues, try refresh
+                                println!("Token is expired. Attempting refresh...");
+                                match self.maybe_refresh_token().await {
+                                    Ok(token_info) => {
+                                        self.token_info = Some(token_info.clone());
+                                        Ok(token_info.access_token.expose_secret().clone())
+                                    }
+                                    Err(refresh_error) => {
+                                        // Check if refresh error is also network related
+                                        match &refresh_error {
+                                            AuthError::RequestError(_) => {
+                                                // Both validation and refresh failed due to network issues, but token is expired
+                                                // We have no choice but to re-authenticate
+                                                println!(
+                                                    "Network issues persisted during refresh. Initiating re-authentication...",
+                                                );
+                                                match self.perform_reauthentication_with_notification().await {
+                                                    Ok(token_info) => {
+                                                        self.token_info = Some(token_info.clone());
+                                                        Ok(token_info.access_token.expose_secret().clone())
+                                                    }
+                                                    Err(e) => Err(e),
+                                                }
+                                            }
+                                            _ => {
+                                                // Refresh failed due to token-related errors, re-authenticate
+                                                println!(
+                                                    "Token refresh failed: {:?}. Initiating re-authentication...",
+                                                    refresh_error
+                                                );
+                                                match self.perform_reauthentication_with_notification().await {
+                                                    Ok(token_info) => {
+                                                        self.token_info = Some(token_info.clone());
+                                                        Ok(token_info.access_token.expose_secret().clone())
+                                                    }
+                                                    Err(e) => Err(e),
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         }
-                        Err(refresh_error) => {
+                        _ => {
+                            // Validation failed due to token-related issues, try refresh first
                             println!(
-                                "Token refresh failed: {:?}. Initiating re-authentication...",
-                                refresh_error
+                                "Token validation failed: {:?}. Attempting refresh...",
+                                validation_error
                             );
-                            match self.perform_reauthentication_with_notification().await {
+                            match self.maybe_refresh_token().await {
                                 Ok(token_info) => {
                                     self.token_info = Some(token_info.clone());
                                     Ok(token_info.access_token.expose_secret().clone())
                                 }
-                                Err(e) => Err(e),
+                                Err(refresh_error) => {
+                                    println!(
+                                        "Token refresh failed: {:?}. Initiating re-authentication...",
+                                        refresh_error
+                                    );
+                                    match self.perform_reauthentication_with_notification().await {
+                                        Ok(token_info) => {
+                                            self.token_info = Some(token_info.clone());
+                                            Ok(token_info.access_token.expose_secret().clone())
+                                        }
+                                        Err(e) => Err(e),
+                                    }
+                                }
                             }
                         }
                     }

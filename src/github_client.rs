@@ -52,6 +52,22 @@ impl GitHubClient {
         if status.is_success() {
             let notifications: Vec<Notification> = response.json().await?;
             Ok(Some(notifications))
+        } else if status == reqwest::StatusCode::FORBIDDEN {
+            // Special handling for 403 errors - could be token-related or other API restrictions
+            let text = response.text().await?;
+            // Check if the error message contains specific indicators for token issues
+            if text.contains("Bad credentials") || text.contains("Invalid token") {
+                Err(AuthError::GeneralError(format!(
+                    "Authentication token error: {} - {}",
+                    status, text
+                )))
+            } else {
+                // For other 403 errors (like rate limits, API restrictions), don't treat as authentication error
+                Err(AuthError::GeneralError(format!(
+                    "API access error: {} - {}",
+                    status, text
+                )))
+            }
         } else {
             let status_code = response.status();
             let text = response.text().await?;
@@ -82,6 +98,22 @@ impl GitHubClient {
         let status = response.status();
         if status.is_success() {
             Ok(())
+        } else if status == reqwest::StatusCode::FORBIDDEN {
+            // Special handling for 403 errors - could be token-related or other API restrictions
+            let text = response.text().await?;
+            // Check if the error message contains specific indicators for token issues
+            if text.contains("Bad credentials") || text.contains("Invalid token") {
+                Err(AuthError::GeneralError(format!(
+                    "Authentication token error: {} - {}",
+                    status, text
+                )))
+            } else {
+                // For other 403 errors (like rate limits, API restrictions), don't treat as authentication error
+                Err(AuthError::GeneralError(format!(
+                    "API access error: {} - {}",
+                    status, text
+                )))
+            }
         } else {
             let text = response.text().await?;
             Err(AuthError::GeneralError(format!(
