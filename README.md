@@ -102,6 +102,7 @@ include_reasons = ["review_requested"]     # 受け取る通知理由（レビ�
 include_subject_types = ["PullRequest"]    # 受け取る通知タイプ（プルリクエストのみ）
 exclude_repositories = []                  # 除外するリポジトリのリスト
 exclude_reasons = []                       # 除外する通知理由のリスト
+exclude_draft_prs = false                  # ドラフトPRの通知を除外するかどうか
 
 # 通知バッチ処理設定（バッチ処理を無効にするにはbatch_size = 0）
 [notification_batch_config]
@@ -173,6 +174,12 @@ include_repositories = ["important-org/main-repo"]
 exclude_private_repos = false
 ```
 
+### ドラフトPRの通知を除外
+```toml
+[notification_filters]
+exclude_draft_prs = true  # ドラフト状態のプルリクエストの通知を除外
+```
+
 ## 設定オプションの詳細
 
 - `poll_interval_sec`: GitHub APIから通知をポーリングする間隔（秒単位）。デフォルトは30秒。
@@ -202,6 +209,7 @@ exclude_private_repos = false
 
 #### 高度なフィルタリング
 - `minimum_updated_time`: 通知の最小更新時間（例: "1h", "30m", "2d"）。この時間より古い通知は除外されます
+- `exclude_draft_prs`: ドラフト状態のプルリクエストの通知を除外するかどうか（trueにするとドラフトPRの通知が表示されません）
 
 ## セキュリティ
 

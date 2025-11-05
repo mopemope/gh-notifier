@@ -68,6 +68,10 @@ pub struct NotificationFilter {
     /// 最小更新時間（例: "1h", "30m", "2d" など）
     #[serde(default)]
     pub minimum_updated_time: Option<String>,
+
+    /// ドラフトPRの通知を除外するかどうか
+    #[serde(default)]
+    pub exclude_draft_prs: bool,
 }
 
 /// 通知バッチ処理の設定

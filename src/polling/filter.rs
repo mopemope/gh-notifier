@@ -169,6 +169,21 @@ pub fn filter_new_notifications<'a>(
             }
         }
 
+        // ドラフトPRのフィルタリング (タイトルに特定のパターンがある場合)
+        if config.notification_filters.exclude_draft_prs && n.subject.kind == "PullRequest" {
+            // Draft PR かどうかをタイトルから判定 (一般的なパターンをチェック)
+            let title_lower = n.subject.title.to_lowercase();
+            let is_draft_by_title = title_lower.contains("draft")
+                || title_lower.contains("[draft]")
+                || title_lower.starts_with("draft:")
+                || title_lower.starts_with("[draft")
+                || title_lower.contains("(draft");
+
+            if is_draft_by_title {
+                return false;
+            }
+        }
+
         true
     });
 
@@ -1106,5 +1121,100 @@ mod tests {
 
         assert_eq!(new_notifications.len(), 1);
         assert_eq!(new_notifications[0].id, "1"); // Only notification 1 matches all criteria
+    }
+
+    #[test]
+    fn test_exclude_draft_prs_filter() {
+        let new_time = "2023-01-02T00:00:00Z";
+
+        let notifications = vec![
+            Notification {
+                id: "1".to_string(),
+                unread: true,
+                reason: "review_requested".to_string(),
+                updated_at: new_time.to_string(),
+                last_read_at: None,
+                subject: NotificationSubject {
+                    title: "[Draft] New feature implementation".to_string(), // Contains "Draft"
+                    url: Some("https://example.com/1".to_string()),
+                    latest_comment_url: None,
+                    kind: "PullRequest".to_string(),
+                },
+                repository: NotificationRepository {
+                    id: 1,
+                    node_id: "node1".to_string(),
+                    name: "repo1".to_string(),
+                    full_name: "user/repo1".to_string(),
+                    private: false,
+                },
+                url: "https://example.com/1".to_string(),
+                subscription_url: "https://example.com/subscription/1".to_string(),
+            },
+            Notification {
+                id: "2".to_string(),
+                unread: true,
+                reason: "review_requested".to_string(),
+                updated_at: new_time.to_string(),
+                last_read_at: None,
+                subject: NotificationSubject {
+                    title: "Ready for review - New feature".to_string(), // Regular PR
+                    url: Some("https://example.com/2".to_string()),
+                    latest_comment_url: None,
+                    kind: "PullRequest".to_string(),
+                },
+                repository: NotificationRepository {
+                    id: 2,
+                    node_id: "node2".to_string(),
+                    name: "repo2".to_string(),
+                    full_name: "user/repo2".to_string(),
+                    private: false,
+                },
+                url: "https://example.com/2".to_string(),
+                subscription_url: "https://example.com/subscription/2".to_string(),
+            },
+            Notification {
+                id: "3".to_string(),
+                unread: true,
+                reason: "comment".to_string(),
+                updated_at: new_time.to_string(),
+                last_read_at: None,
+                subject: NotificationSubject {
+                    title: "Issue comment".to_string(),
+                    url: Some("https://example.com/3".to_string()),
+                    latest_comment_url: None,
+                    kind: "Issue".to_string(), // Not a PR
+                },
+                repository: NotificationRepository {
+                    id: 3,
+                    node_id: "node3".to_string(),
+                    name: "repo3".to_string(),
+                    full_name: "user/repo3".to_string(),
+                    private: false,
+                },
+                url: "https://example.com/3".to_string(),
+                subscription_url: "https://example.com/subscription/3".to_string(),
+            },
+        ];
+
+        let mut state_manager = StateManager::new().unwrap();
+        state_manager.update_last_checked_at("2023-01-01T00:00:00Z".to_string());
+
+        let mut config = Config::default();
+        // Reset notification filters to allow the test to work as expected
+        config.notification_filters = NotificationFilter::default();
+        // Clear include filters so all notification types are considered
+        config.notification_filters.include_reasons = vec![];
+        config.notification_filters.include_subject_types = vec![];
+        // Enable the draft PR exclusion filter
+        config.notification_filters.exclude_draft_prs = true;
+
+        let new_notifications = filter_new_notifications(&notifications, &state_manager, &config);
+
+        // Should have 2 notifications: the non-draft PR and the issue comment
+        assert_eq!(new_notifications.len(), 2);
+        // Check that the draft PR (id="1") is not in the results
+        for notification in new_notifications.iter() {
+            assert_ne!(notification.id, "1"); // Draft PR should be excluded
+        }
     }
 }
