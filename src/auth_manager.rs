@@ -564,12 +564,14 @@ impl AuthManager {
                 tracing::debug!("Token validation failed: token is expired");
                 return Ok(false);
             }
-            
+
             let client = reqwest::Client::builder()
                 .user_agent(format!("gh-notifier/{}", env!("CARGO_PKG_VERSION")))
                 .build()
-                .map_err(|e| AuthError::GeneralError(format!("Failed to create HTTP client: {}", e)))?;
-                
+                .map_err(|e| {
+                    AuthError::GeneralError(format!("Failed to create HTTP client: {}", e))
+                })?;
+
             let response = client
                 .get("https://api.github.com/user")
                 .header(
@@ -702,13 +704,17 @@ impl AuthManager {
                     match &validation_error {
                         AuthError::RequestError(_) => {
                             // This is likely a network connectivity issue, not a token issue
-                            println!("Token validation failed due to network issues. Checking if current token is still valid...");
-                            
+                            println!(
+                                "Token validation failed due to network issues. Checking if current token is still valid..."
+                            );
+
                             // Check if token is still valid based on expiration time only
                             if !self.is_access_token_expired() {
                                 // Current token is still valid based on expiration, return it despite network validation failure
                                 if let Some(token_info) = &self.token_info {
-                                    println!("Network issues encountered, but current token is still valid. Continuing with current token.");
+                                    println!(
+                                        "Network issues encountered, but current token is still valid. Continuing with current token."
+                                    );
                                     Ok(token_info.access_token.expose_secret().clone())
                                 } else {
                                     // This shouldn't happen, but just in case
@@ -731,10 +737,16 @@ impl AuthManager {
                                                 println!(
                                                     "Network issues persisted during refresh. Initiating re-authentication...",
                                                 );
-                                                match self.perform_reauthentication_with_notification().await {
+                                                match self
+                                                    .perform_reauthentication_with_notification()
+                                                    .await
+                                                {
                                                     Ok(token_info) => {
                                                         self.token_info = Some(token_info.clone());
-                                                        Ok(token_info.access_token.expose_secret().clone())
+                                                        Ok(token_info
+                                                            .access_token
+                                                            .expose_secret()
+                                                            .clone())
                                                     }
                                                     Err(e) => Err(e),
                                                 }
@@ -745,10 +757,16 @@ impl AuthManager {
                                                     "Token refresh failed: {:?}. Initiating re-authentication...",
                                                     refresh_error
                                                 );
-                                                match self.perform_reauthentication_with_notification().await {
+                                                match self
+                                                    .perform_reauthentication_with_notification()
+                                                    .await
+                                                {
                                                     Ok(token_info) => {
                                                         self.token_info = Some(token_info.clone());
-                                                        Ok(token_info.access_token.expose_secret().clone())
+                                                        Ok(token_info
+                                                            .access_token
+                                                            .expose_secret()
+                                                            .clone())
                                                     }
                                                     Err(e) => Err(e),
                                                 }

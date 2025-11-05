@@ -20,6 +20,7 @@ winrt-notification = { version = "0.5", optional = true }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tracing-appender = "0.2"
+chrono = { version = "0.4", features = ["serde"] }
 
 [dev-dependencies]
 tempfile = "3.0"

@@ -18,18 +18,22 @@ pub struct StateManager {
 
 impl StateManager {
     pub fn new() -> Result<Self, Box<dyn std::error::Error>> {
-        let state_file_path = Self::state_file_path();
+        let state_file_path = Self::default_state_file_path();
         let parent_dir = state_file_path.parent().unwrap();
 
         // 状態ファイルの親ディレクトリが存在しない場合は作成
         if !parent_dir.exists() {
-            fs::create_dir_all(parent_dir)?;
+            std::fs::create_dir_all(parent_dir)?;
         }
 
-        // 状態ファイルが存在すれば読み込み、なければデフォルト状態
+        // 状態ファイルが存在し、かつ空でなければ読み込み、そうでなければデフォルト状態
         let state = if state_file_path.exists() {
-            let contents = fs::read_to_string(&state_file_path)?;
-            serde_json::from_str(&contents)?
+            let contents = std::fs::read_to_string(&state_file_path)?;
+            if contents.trim().is_empty() {
+                State::default()
+            } else {
+                serde_json::from_str(&contents)?
+            }
         } else {
             State::default()
         };
@@ -40,13 +44,39 @@ impl StateManager {
         })
     }
 
-    fn state_file_path() -> PathBuf {
+    fn default_state_file_path() -> PathBuf {
         let mut path = dirs::config_dir().unwrap_or_else(|| {
             std::env::current_dir().expect("現在のディレクトリが取得できません")
         });
         path.push("gh-notifier");
         path.push("state.json");
         path
+    }
+
+    pub fn new_with_path(path: PathBuf) -> Result<Self, Box<dyn std::error::Error>> {
+        let parent_dir = path.parent().unwrap();
+
+        // 状態ファイルの親ディレクトリが存在しない場合は作成
+        if !parent_dir.exists() {
+            std::fs::create_dir_all(parent_dir)?;
+        }
+
+        // 状態ファイルが存在し、かつ空でなければ読み込み、そうでなければデフォルト状態
+        let state = if path.exists() {
+            let contents = std::fs::read_to_string(&path)?;
+            if contents.trim().is_empty() {
+                State::default()
+            } else {
+                serde_json::from_str(&contents)?
+            }
+        } else {
+            State::default()
+        };
+
+        Ok(StateManager {
+            state_file_path: path,
+            state,
+        })
     }
 
     /// 状態をファイルに保存
@@ -124,16 +154,30 @@ mod tests {
     fn test_state_manager_new_with_file() {
         let temp_file = NamedTempFile::new().unwrap();
         let temp_path = temp_file.path();
-        let state_manager = StateManager {
-            state_file_path: temp_path.to_path_buf(),
-            state: State::default(),
-        };
+
+        // Create a state manager and update its state
+        let mut state_manager = StateManager::new_with_path(temp_path.to_path_buf()).unwrap();
+        state_manager.update_last_checked_at("2023-01-01T00:00:00Z".to_string());
+        state_manager.update_etag(
+            "https://api.github.com/notifications".to_string(),
+            "test-etag".to_string(),
+        );
         // ファイルに保存
         state_manager.save().unwrap();
+
         // ファイルから読み込み
-        let state_manager2 = StateManager::new().unwrap();
-        assert!(state_manager2.state.last_checked_at.is_none());
-        assert!(state_manager2.state.etags.is_empty());
+        let state_manager2 = StateManager::new_with_path(temp_path.to_path_buf()).unwrap();
+        assert_eq!(
+            state_manager2.state.last_checked_at,
+            Some("2023-01-01T00:00:00Z".to_string())
+        );
+        assert_eq!(
+            state_manager2
+                .state
+                .etags
+                .get("https://api.github.com/notifications"),
+            Some(&"test-etag".to_string())
+        );
     }
 
     #[test]

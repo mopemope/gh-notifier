@@ -12,6 +12,62 @@ pub struct NotificationFilter {
     /// 除外する通知の理由のリスト（例: "mention", "comment", "subscribed" など）
     #[serde(default)]
     pub exclude_reasons: Vec<String>,
+
+    // 新しいリポジトリベースのフィルター
+    /// 含めるリポジトリのリスト（指定がある場合、このリストに含まれるリポジトリのみ通知）
+    #[serde(default)]
+    pub include_repositories: Vec<String>,
+
+    /// 含める組織のリスト（指定がある場合、このリストに含まれる組織のリポジトリのみ通知）
+    #[serde(default)]
+    pub include_organizations: Vec<String>,
+
+    /// 除外する組織のリスト（このリストに含まれる組織のリポジトリは通知されない）
+    #[serde(default)]
+    pub exclude_organizations: Vec<String>,
+
+    /// プライベートリポジトリの通知を除外するかどうか
+    #[serde(default)]
+    pub exclude_private_repos: bool,
+
+    /// フォークリポジトリの通知を除外するかどうか
+    #[serde(default)]
+    pub exclude_fork_repos: bool,
+
+    // 新しいタイプベースのフィルター
+    /// 含める通知の種類のリスト（例: "Issue", "PullRequest", "Commit", "Release" など）
+    #[serde(default)]
+    pub include_subject_types: Vec<String>,
+
+    /// 除外する通知の種類のリスト（例: "Commit", "Release" など）
+    #[serde(default)]
+    pub exclude_subject_types: Vec<String>,
+
+    /// 含める通知の理由のリスト（指定がある場合、このリストに含まれる理由のみ通知）
+    #[serde(default)]
+    pub include_reasons: Vec<String>,
+
+    // 新しいコンテンツベースのフィルター
+    /// 通知タイトルに含まれるべきキーワードのリスト
+    #[serde(default)]
+    pub title_contains: Vec<String>,
+
+    /// 通知タイトルに含まれてはいけないキーワードのリスト
+    #[serde(default)]
+    pub title_not_contains: Vec<String>,
+
+    /// リポジトリ名に含まれるべきキーワードのリスト
+    #[serde(default)]
+    pub repository_contains: Vec<String>,
+
+    /// 参加したスレッドの通知を除外するかどうか
+    #[serde(default)]
+    pub exclude_participating: bool,
+
+    // 新しい高度なフィルター
+    /// 最小更新時間（例: "1h", "30m", "2d" など）
+    #[serde(default)]
+    pub minimum_updated_time: Option<String>,
 }
 
 /// 通知バッチ処理の設定

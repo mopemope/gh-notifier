@@ -118,8 +118,29 @@ retry_interval_sec = 5                   # 再試行間隔（秒）
 - `mark_as_read_on_notify`: trueにすると、通知表示時に自動的にGitHub上で通知を既読に設定します。
 - `log_level`: ログの詳細度（info, debug, warn, error）。デフォルトはinfo。
 - `client_id`: GitHub OAuthアプリケーションのクライアントID。デフォルトは組み込みのID。
-- `exclude_repositories`: 通知を受け取りたくないリポジトリのリスト。
-- `exclude_reasons`: 通知を受け取りたくない理由のリスト（例: "mention", "comment", "subscribed" など）。
+
+### 通知フィルタリングオプション
+
+#### リポジトリベースのフィルタリング
+- `include_repositories`: 通知を受け取りたいリポジトリのリスト（指定されたリポジトリからのみ通知を受信）
+- `exclude_repositories`: 通知を受け取りたくないリポジトリのリスト
+- `include_organizations`: 通知を受け取りたい組織のリスト（指定された組織のリポジトリからのみ通知を受信）
+- `exclude_organizations`: 通知を受け取りたくない組織のリスト
+- `exclude_private_repos`: trueにすると、プライベートリポジトリからの通知を除外します
+
+#### 通知タイプベースのフィルタリング
+- `include_subject_types`: 通知を受け取りたい通知タイプのリスト（例: "Issue", "PullRequest", "Commit", "Release"）
+- `exclude_subject_types`: 通知を受け取りたくない通知タイプのリスト
+- `include_reasons`: 通知を受け取りたい通知理由のリスト（指定された理由のみ通知を受信）
+- `exclude_reasons`: 通知を受け取りたくない通知理由のリスト（例: "mention", "comment", "subscribed" など）
+
+#### コンテンツベースのフィルタリング
+- `title_contains`: 通知タイトルに含まれるべきキーワードのリスト（指定されたキーワードを含むタイトルのみ通知）
+- `title_not_contains`: 通知タイトルに含まれてはいけないキーワードのリスト
+- `repository_contains`: 通知を受け取りたいリポジトリ名に含まれるべきキーワードのリスト
+
+#### 高度なフィルタリング
+- `minimum_updated_time`: 通知の最小更新時間（例: "1h", "30m", "2d"）。この時間より古い通知は除外されます
 
 ## セキュリティ
 

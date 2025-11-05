@@ -1,0 +1,113 @@
+# gh-notifier Configuration Example
+#
+# Copy this file to ~/.config/gh-notifier/config.toml to customize your settings
+
+# Basic polling configuration
+poll_interval_sec = 30
+mark_as_read_on_notify = false
+
+# GitHub OAuth Client ID (default is provided, only change if needed)
+client_id = "Iv1.898a6d2a86c3f7aa"
+
+# Logging configuration
+log_level = "info"
+# log_file_path = "/path/to/gh-notifier.log"  # Optional: specify custom log file path
+
+# Notification filter configuration
+[notification_filters]
+
+# Repository-based filters
+# Only show notifications from specific repositories (if specified, only these will be shown)
+include_repositories = [
+  "your-org/your-main-project",
+  "your-org/your-other-project"
+]
+
+# Hide notifications from specific repositories
+exclude_repositories = [
+  "spam-org/spam-repo"
+]
+
+# Only show notifications from specific organizations
+include_organizations = [
+  "your-org"
+]
+
+# Hide notifications from specific organizations
+exclude_organizations = [
+  "spam-org"
+]
+
+# Hide notifications from private repositories
+exclude_private_repos = false  # Set to true to exclude private repos
+
+# Hide notifications from forked repositories (not currently implemented in API)
+exclude_fork_repos = false
+
+# Type-based filters
+# Only show specific notification subject types (Issue, PullRequest, Commit, Release, etc.)
+# If specified, only notifications of these types will be shown
+include_subject_types = [
+  "Issue",
+  "PullRequest"
+]
+
+# Hide specific notification subject types
+exclude_subject_types = [
+  "Commit",
+  "Release"
+]
+
+# Only show notifications with specific reasons (if specified, only these will be shown)
+include_reasons = [
+  "mention",
+  "review_requested"
+]
+
+# Hide notifications with specific reasons
+exclude_reasons = [
+  "comment",
+  "push"
+]
+
+# Content-based filters
+# Only show notifications with titles containing these keywords
+title_contains = [
+  "urgent",
+  "critical"
+]
+
+# Hide notifications with titles containing these keywords
+title_not_contains = [
+  "wip",
+  "draft"
+]
+
+# Only show notifications from repositories with names containing these keywords
+repository_contains = [
+  "important",
+  "main"
+]
+
+# Hide notifications from threads you've participated in (not currently implemented in API)
+exclude_participating = false
+
+# Advanced filters
+# Only show notifications updated within this time period
+# Format: number followed by unit (s=seconds, m=minutes, h=hours, d=days)
+# Example: "1h" = last hour, "30m" = last 30 minutes, "2d" = last 2 days
+minimum_updated_time = "24h"  # Only show notifications from the last 24 hours
+
+# Notification batching configuration
+[notification_batch_config]
+# Batch size: number of notifications to group together (0 to disable batching)
+batch_size = 5
+# Interval between notification batches (in seconds)
+batch_interval_sec = 30
+
+# Error handling configuration
+[polling_error_handling_config]
+# Number of retry attempts when polling fails
+retry_count = 3
+# Interval between retries (in seconds)
+retry_interval_sec = 5
