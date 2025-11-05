@@ -6,22 +6,42 @@ use crate::config::Config;
 
 /// Set up application logging based on configuration
 pub fn setup_logging(config: &Config) -> tracing_appender::non_blocking::WorkerGuard {
-    let (file_writer, guard) = create_file_logger(&config.log_file_path);
-
     // Initialize tracing logger with level from config
     let log_level = &config.log_level;
     let env_filter =
         EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(log_level));
 
-    let subscriber = FmtSubscriber::builder()
-        .with_env_filter(env_filter)
-        .with_writer(file_writer) // Log to file
-        .finish();
+    if config.log_file_path.is_none() {
+        // When no file path is specified, log only to stdout/stderr
+        let subscriber = FmtSubscriber::builder()
+            .with_env_filter(env_filter)
+            .with_writer(std::io::stderr) // Log to stderr by default
+            .finish();
 
-    tracing::subscriber::set_global_default(subscriber)
-        .expect("Failed to set global tracing subscriber");
+        tracing::subscriber::set_global_default(subscriber)
+            .expect("Failed to set global tracing subscriber");
 
-    guard
+        // Return a dummy guard - we still need to return the same type
+        // Create a non-blocking writer that won't be used
+        let (_dummy_writer, guard) = tracing_appender::non_blocking(
+            tracing_appender::rolling::never(std::env::temp_dir(), "unused.log"),
+        );
+
+        guard
+    } else {
+        // Use file logging when a file path is specified
+        let (file_writer, guard) = create_file_logger(&config.log_file_path);
+
+        let subscriber = FmtSubscriber::builder()
+            .with_env_filter(env_filter)
+            .with_writer(file_writer) // Log to file
+            .finish();
+
+        tracing::subscriber::set_global_default(subscriber)
+            .expect("Failed to set global tracing subscriber");
+
+        guard
+    }
 }
 
 // Create file logger
