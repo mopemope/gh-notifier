@@ -211,6 +211,21 @@ exclude_draft_prs = true  # ドラフト状態のプルリクエストの通知�
 - `minimum_updated_time`: 通知の最小更新時間（例: "1h", "30m", "2d"）。この時間より古い通知は除外されます
 - `exclude_draft_prs`: ドラフト状態のプルリクエストの通知を除外するかどうか（trueにするとドラフトPRの通知が表示されません）
 
+#### 通知理由の種類 (Reasons)
+通知のフィルタリングで使用できる理由の種類:
+
+- `assign`: 自分にアサインされた場合
+- `author`: 自分が作成したリソースに関する通知（例: 自分が作成したIssueの更新）
+- `comment`: 自分の投稿に対するコメント
+- `invitation`: リポジトリへの招待
+- `manual`: 手動でメンションされた（例: `@username`）
+- `mention`: 自分へのメンション（`manual`と同義）
+- `review_requested`: 自分にレビューが依頼された
+- `security_alert`: セキュリティアラート
+- `state_change`: 自分が関連するIssue/Pull Requestの状態変更（オープン、クローズなど）
+- `subscribed`: 購読しているリポジトリでのアクティビティ
+- `team_mention`: 自分のチームへのメンション
+
 ## セキュリティ
 
 - トークンはOSキーチェーンに安全に保存されます
