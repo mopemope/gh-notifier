@@ -1,31 +1,44 @@
+use crate::token_storage::TokenStorage;
 use crate::{AuthError, DeviceAuthResponse, ErrorResponse, TokenInfo, TokenResponse};
-use keyring::Entry;
 use secrecy::{ExposeSecret, SecretString};
-use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-const GITHUB_OAUTH_CLIENT_ID: &str = "Iv1.898a6d2a86c3f7aa"; // This would be configurable in a real app
 const GITHUB_DEVICE_AUTHORIZATION_URL: &str = "https://github.com/login/device/code";
 const GITHUB_TOKEN_URL: &str = "https://github.com/login/oauth/access_token";
 
 pub struct AuthManager {
     pub client_id: String,
     pub token_info: Option<TokenInfo>,
-    keychain_entry: Option<Arc<Entry>>,
+    token_storage: TokenStorage,
 }
 
 impl AuthManager {
-    /// Creates a new AuthManager instance
+    /// Creates a new AuthManager instance for normal usage
     pub fn new() -> Result<Self, AuthError> {
-        let keychain_entry = match Entry::new("gh-notifier", "github_auth_token") {
-            Ok(entry) => Some(Arc::new(entry)),
-            Err(e) => {
-                tracing::warn!(
-                    "Keyring is not available on this system ({}), tokens will not persist between sessions.",
-                    e
-                );
-                None
-            }
+        // Create the token storage with fallback mechanisms
+        let token_storage = TokenStorage::new()?;
+
+        // Load the config to get the client ID
+        let config = crate::config::load_config()
+            .map_err(|e| AuthError::GeneralError(format!("Failed to load config: {}", e)))?;
+
+        Ok(AuthManager {
+            client_id: config.client_id,
+            token_info: None,
+            token_storage,
+        })
+    }
+
+    /// Creates a new AuthManager instance for tests (with no keyring)
+    #[cfg(test)]
+    pub fn new_for_tests() -> Result<Self, AuthError> {
+        // Create a temporary path for the token file in tests
+        let mut token_file_path = std::env::temp_dir();
+        token_file_path.push("gh_notifier_test_token.json");
+
+        let token_storage = crate::token_storage::TokenStorage {
+            keyring_entry: None,
+            token_file_path,
         };
 
         // Load the config to get the client ID
@@ -35,7 +48,7 @@ impl AuthManager {
         Ok(AuthManager {
             client_id: config.client_id,
             token_info: None,
-            keychain_entry,
+            token_storage,
         })
     }
 
@@ -55,30 +68,27 @@ impl AuthManager {
             .send()
             .await?;
 
-        // Check if response status is successful before attempting JSON parse
-        if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await?;
+        let status = response.status();
+        let response_text = response.text().await?;
+        tracing::debug!("Device authorization response: {}", response_text);
 
+        // Check if response status is successful before attempting JSON parse
+        if !status.is_success() {
             // Check if this is a 404 error which usually indicates an invalid client_id
             if status.as_u16() == 404 {
                 return Err(AuthError::GeneralError(format!(
                     "Device authorization request failed: Invalid client_id. Status: {} - {} \n\
                     This usually means the GitHub OAuth client_id is invalid or not registered for device flow. \n\
                     Please register your own GitHub OAuth App and set the correct client_id in the config file.",
-                    status, error_text
+                    status, response_text
                 )));
             } else {
                 return Err(AuthError::GeneralError(format!(
                     "Device authorization request failed: {} - {}",
-                    status, error_text
+                    status, response_text
                 )));
             }
         }
-
-        // Get response text to see what we're actually getting
-        let response_text = response.text().await?;
-        tracing::debug!("Device authorization response: {}", response_text);
 
         // Parse the device authorization response properly
         let device_response: DeviceAuthResponse = serde_json::from_str(&response_text)?;
@@ -331,117 +341,39 @@ impl AuthManager {
         }
     }
 
-    /// Loads the token from the OS keychain
-    pub fn load_token_from_keychain(&mut self) -> Result<Option<TokenInfo>, AuthError> {
-        match &self.keychain_entry {
-            Some(entry) => {
-                match entry.get_password() {
-                    Ok(token_json) => {
-                        if !token_json.is_empty() {
-                            match serde_json::from_str::<TokenInfo>(&token_json) {
-                                Ok(token_info) => {
-                                    tracing::debug!("Token successfully loaded from keychain");
-                                    self.token_info = Some(token_info.clone());
-                                    Ok(Some(token_info))
-                                }
-                                Err(e) => {
-                                    tracing::error!(
-                                        "Failed to deserialize token from keychain: {:?}",
-                                        e
-                                    );
-                                    Err(AuthError::GeneralError(format!(
-                                        "Failed to deserialize token: {}",
-                                        e
-                                    )))
-                                }
-                            }
-                        } else {
-                            tracing::debug!("No token found in keychain");
-                            Ok(None)
-                        }
-                    }
-                    Err(keyring::Error::NoEntry) => {
-                        tracing::debug!("No token entry found in keychain");
-                        Ok(None)
-                    }
-                    Err(e) => {
-                        // Log the specific error but return Ok(None) to allow the application to continue
-                        // This handles cases where keyring is available during initialization but not during operations
-                        tracing::warn!("Failed to read token from keychain: {:?}. Tokens will not be loaded from keychain.", e);
-                        Ok(None)
-                    }
-                }
+    /// Loads the token from storage (with fallback mechanisms)
+    pub fn load_token_from_storage(&mut self) -> Result<Option<TokenInfo>, AuthError> {
+        match self.token_storage.load_token() {
+            Ok(Some(token_info)) => {
+                tracing::info!("Token successfully loaded from storage");
+                self.token_info = Some(token_info.clone());
+                Ok(Some(token_info))
             }
-            None => {
-                tracing::warn!("Cannot load token: keychain entry not initialized");
+            Ok(None) => {
+                tracing::debug!("No token found in storage");
+                Ok(None)
+            }
+            Err(e) => {
+                tracing::warn!(
+                    "Failed to load token from storage: {:?}. Tokens will not be loaded.",
+                    e
+                );
                 Ok(None)
             }
         }
     }
 
-    /// Saves the token to the OS keychain
-    pub fn save_token_to_keychain(&self, token_info: &TokenInfo) -> Result<(), AuthError> {
-        match &self.keychain_entry {
-            Some(entry) => {
-                let token_json = serde_json::to_string(token_info)?;
-                match entry.set_password(&token_json) {
-                    Ok(()) => {
-                        tracing::debug!("Token successfully saved to keychain");
-                        Ok(())
-                    }
-                    Err(e) => {
-                        // Log the specific error but return Ok(()) to allow the application to continue
-                        // This handles cases where keyring is available during initialization but not during operations
-                        tracing::warn!("Failed to save token to keychain: {:?}. Tokens will not persist between sessions.", e);
-                        Ok(())
-                    }
-                }
-            }
-            None => {
-                tracing::warn!("Cannot save token: keychain entry not initialized");
-                // If there's no keychain entry, we return Ok to allow the application to continue
-                // Tokens just won't persist between sessions
-                Ok(())
-            }
-        }
+    /// Saves the token to storage (with fallback mechanisms)
+    pub fn save_token_to_storage(&self, token_info: &TokenInfo) -> Result<(), AuthError> {
+        self.token_storage.save_token(token_info)
     }
 
-    /// Deletes the token from the OS keychain
-    pub fn delete_token_from_keychain(&mut self) -> Result<(), AuthError> {
-        match &self.keychain_entry {
-            Some(entry) => {
-                match entry.delete_password() {
-                    Ok(()) => {
-                        tracing::debug!("Token successfully deleted from keychain");
-                        // Clear the in-memory token info as well
-                        self.token_info = None;
-                        Ok(())
-                    }
-                    Err(keyring::Error::NoEntry) => {
-                        tracing::debug!("No token entry found to delete from keychain");
-                        // If the item doesn't exist, that's not really an error from the user's perspective
-                        // Still clear the in-memory token info if it exists
-                        self.token_info = None;
-                        Ok(())
-                    }
-                    Err(e) => {
-                        // Log the specific error but return Ok(()) to allow the application to continue
-                        // This handles cases where keyring is available during initialization but not during operations
-                        tracing::warn!("Failed to delete token from keychain: {:?}.", e);
-                        // Still clear the in-memory token info if it exists
-                        self.token_info = None;
-                        Ok(())
-                    }
-                }
-            }
-            None => {
-                tracing::warn!("Cannot delete token: keychain entry not initialized");
-                // If there's no keychain entry, we return Ok to allow the application to continue
-                // Just clear the in-memory token info
-                self.token_info = None;
-                Ok(())
-            }
-        }
+    /// Deletes the token from storage (with fallback mechanisms)
+    pub fn delete_token_from_storage(&mut self) -> Result<(), AuthError> {
+        self.token_storage.delete_token()?;
+        // Clear the in-memory token info as well
+        self.token_info = None;
+        Ok(())
     }
 
     /// Checks if the access token has expired
@@ -573,8 +505,12 @@ impl AuthManager {
         match self.refresh_token().await {
             Ok(token_info) => {
                 // Save the new token to keychain
-                if let Err(e) = self.save_token_to_keychain(&token_info) {
-                    eprintln!("Failed to save refreshed token to keychain: {:?}", e);
+                if let Err(e) = self.save_token_to_storage(&token_info) {
+                    eprintln!("Failed to save refreshed token to storage: {:?}", e);
+                    eprintln!(
+                        "WARNING: Refreshed authentication token will not persist between sessions."
+                    );
+                    eprintln!("You may need to re-authenticate if the token expires.");
                 }
                 Ok(token_info)
             }
@@ -601,17 +537,19 @@ impl AuthManager {
 
     /// Initiates re-authentication when refresh tokens are no longer valid
     pub async fn initiate_reauthentication(&mut self) -> Result<TokenInfo, AuthError> {
-        // First, delete the old (invalid) token from keychain
-        if let Err(e) = self.delete_token_from_keychain() {
-            eprintln!("Warning: failed to delete old token from keychain: {:?}", e);
+        // First, delete the old (invalid) token from storage
+        if let Err(e) = self.delete_token_from_storage() {
+            eprintln!("Warning: failed to delete old token from storage: {:?}", e);
         }
 
         // Perform the full authentication flow
         let token_info = self.authenticate().await?;
 
-        // Save the new token to keychain
-        if let Err(e) = self.save_token_to_keychain(&token_info) {
-            eprintln!("Failed to save new token to keychain: {:?}", e);
+        // Save the new token to storage
+        if let Err(e) = self.save_token_to_storage(&token_info) {
+            eprintln!("Failed to save new token to storage: {:?}", e);
+            eprintln!("WARNING: New authentication token will not persist between sessions.");
+            eprintln!("You will need to re-authenticate each time you run the application.");
         }
 
         Ok(token_info)
@@ -679,9 +617,15 @@ impl AuthManager {
             return match self.authenticate().await {
                 Ok(token_info) => {
                     self.token_info = Some(token_info.clone());
-                    // Save the new token to keychain
-                    if let Err(e) = self.save_token_to_keychain(&token_info) {
-                        eprintln!("Failed to save new token to keychain: {:?}", e);
+                    // Save the new token to storage
+                    if let Err(e) = self.save_token_to_storage(&token_info) {
+                        eprintln!("Failed to save new token to storage: {:?}", e);
+                        eprintln!(
+                            "WARNING: Authentication token will not persist between sessions."
+                        );
+                        eprintln!(
+                            "You will need to re-authenticate each time you run the application."
+                        );
                     }
                     Ok(token_info.access_token.expose_secret().clone())
                 }
@@ -813,11 +757,14 @@ mod tests {
             .unwrap()
             .as_secs();
 
-        // Create an AuthManager instance without using keychain
+        // Create token storage that doesn't use system keyring for tests
+        let token_storage = TokenStorage::new().unwrap();
+
+        // Create an AuthManager instance with token storage
         let mut auth_manager = AuthManager {
-            client_id: GITHUB_OAUTH_CLIENT_ID.to_string(),
+            client_id: crate::config::Config::default().client_id,
             token_info: None,
-            keychain_entry: None,
+            token_storage,
         };
 
         // Test 1: Token that is expired
@@ -894,12 +841,10 @@ mod tests {
             .unwrap()
             .as_secs();
 
-        // Create an AuthManager instance without using keychain
-        let mut auth_manager = AuthManager {
-            client_id: GITHUB_OAUTH_CLIENT_ID.to_string(),
-            token_info: None,
-            keychain_entry: None,
-        };
+        // Create an AuthManager instance for testing
+        let mut auth_manager = AuthManager::new_for_tests().unwrap();
+        auth_manager.client_id = crate::config::Config::default().client_id; // Override for test
+        auth_manager.token_info = None;
 
         // Set up an expired token
         let expired_token = TokenInfo {
@@ -920,11 +865,9 @@ mod tests {
     #[test]
     fn test_token_without_expiration() {
         // Create an AuthManager without token info
-        let auth_manager = AuthManager {
-            client_id: GITHUB_OAUTH_CLIENT_ID.to_string(),
-            token_info: None,
-            keychain_entry: None,
-        };
+        let mut auth_manager = AuthManager::new_for_tests().unwrap();
+        auth_manager.client_id = crate::config::Config::default().client_id; // Override for test
+        auth_manager.token_info = None;
 
         // Token should be considered expired if there's no token info
         assert!(auth_manager.is_access_token_expired());
@@ -938,11 +881,9 @@ mod tests {
             refresh_token_expires_at: None, // No expiration time
         };
 
-        let auth_manager_with_token = AuthManager {
-            client_id: GITHUB_OAUTH_CLIENT_ID.to_string(),
-            token_info: Some(no_expiry_token),
-            keychain_entry: None,
-        };
+        let mut auth_manager_with_token = AuthManager::new_for_tests().unwrap();
+        auth_manager_with_token.client_id = crate::config::Config::default().client_id; // Override for test
+        auth_manager_with_token.token_info = Some(no_expiry_token);
 
         // Token without expiration should NOT be considered expiring soon (as a safety measure)
         // Only tokens that actually exist without expiration are considered valid
@@ -962,11 +903,9 @@ mod tests {
             .as_secs();
 
         // Test is_access_token_expired with no token
-        let auth_manager_no_token = AuthManager {
-            client_id: GITHUB_OAUTH_CLIENT_ID.to_string(),
-            token_info: None,
-            keychain_entry: None,
-        };
+        let mut auth_manager_no_token = AuthManager::new_for_tests().unwrap();
+        auth_manager_no_token.client_id = crate::config::Config::default().client_id; // Override for test
+        auth_manager_no_token.token_info = None;
 
         assert!(auth_manager_no_token.is_access_token_expired());
         assert!(auth_manager_no_token.is_access_token_expiring_soon(0));
@@ -980,11 +919,9 @@ mod tests {
             refresh_token_expires_at: Some(now + 1000), // Valid refresh token
         };
 
-        let auth_manager_expired = AuthManager {
-            client_id: GITHUB_OAUTH_CLIENT_ID.to_string(),
-            token_info: Some(expired_token),
-            keychain_entry: None,
-        };
+        let mut auth_manager_expired = AuthManager::new_for_tests().unwrap();
+        auth_manager_expired.client_id = crate::config::Config::default().client_id; // Override for test
+        auth_manager_expired.token_info = Some(expired_token);
 
         assert!(auth_manager_expired.is_access_token_expired());
         assert!(auth_manager_expired.is_access_token_expiring_soon(0));
@@ -999,11 +936,9 @@ mod tests {
             refresh_token_expires_at: Some(now + 2000), // Valid refresh token
         };
 
-        let auth_manager_valid = AuthManager {
-            client_id: GITHUB_OAUTH_CLIENT_ID.to_string(),
-            token_info: Some(valid_token),
-            keychain_entry: None,
-        };
+        let mut auth_manager_valid = AuthManager::new_for_tests().unwrap();
+        auth_manager_valid.client_id = crate::config::Config::default().client_id; // Override for test
+        auth_manager_valid.token_info = Some(valid_token);
 
         assert!(!auth_manager_valid.is_access_token_expired());
         assert!(!auth_manager_valid.is_access_token_expiring_soon(100)); // Won't expire in next 100 seconds
@@ -1028,11 +963,9 @@ mod tests {
             refresh_token_expires_at: None,
         };
 
-        let auth_manager_no_refresh = AuthManager {
-            client_id: GITHUB_OAUTH_CLIENT_ID.to_string(),
-            token_info: Some(no_refresh_token),
-            keychain_entry: None,
-        };
+        let mut auth_manager_no_refresh = AuthManager::new_for_tests().unwrap();
+        auth_manager_no_refresh.client_id = crate::config::Config::default().client_id; // Override for test
+        auth_manager_no_refresh.token_info = Some(no_refresh_token);
 
         assert!(auth_manager_no_refresh.is_refresh_token_expired());
 
@@ -1045,11 +978,9 @@ mod tests {
             refresh_token_expires_at: Some(now - 100), // Expired
         };
 
-        let auth_manager_expired_refresh = AuthManager {
-            client_id: GITHUB_OAUTH_CLIENT_ID.to_string(),
-            token_info: Some(expired_refresh_token),
-            keychain_entry: None,
-        };
+        let mut auth_manager_expired_refresh = AuthManager::new_for_tests().unwrap();
+        auth_manager_expired_refresh.client_id = crate::config::Config::default().client_id; // Override for test
+        auth_manager_expired_refresh.token_info = Some(expired_refresh_token);
 
         assert!(auth_manager_expired_refresh.is_refresh_token_expired());
 
@@ -1062,11 +993,9 @@ mod tests {
             refresh_token_expires_at: Some(now + 1000), // Valid
         };
 
-        let auth_manager_valid_refresh = AuthManager {
-            client_id: GITHUB_OAUTH_CLIENT_ID.to_string(),
-            token_info: Some(valid_refresh_token),
-            keychain_entry: None,
-        };
+        let mut auth_manager_valid_refresh = AuthManager::new_for_tests().unwrap();
+        auth_manager_valid_refresh.client_id = crate::config::Config::default().client_id; // Override for test
+        auth_manager_valid_refresh.token_info = Some(valid_refresh_token);
 
         assert!(!auth_manager_valid_refresh.is_refresh_token_expired());
     }
@@ -1075,11 +1004,9 @@ mod tests {
     async fn test_perform_reauthentication_with_notification() {
         // Note: This test doesn't actually perform re-authentication since that requires network interaction
         // This is just to test that the method exists and can be called
-        let mut auth_manager = AuthManager {
-            client_id: GITHUB_OAUTH_CLIENT_ID.to_string(),
-            token_info: None,
-            keychain_entry: None,
-        };
+        let mut auth_manager = AuthManager::new_for_tests().unwrap();
+        auth_manager.client_id = crate::config::Config::default().client_id; // Override for test
+        auth_manager.token_info = None;
 
         // We expect this to fail since there's no actual token to refresh
         // but we're testing that the method is callable
@@ -1100,11 +1027,9 @@ mod tests {
             .as_secs();
 
         // Test 1: When no token exists
-        let mut auth_manager = AuthManager {
-            client_id: GITHUB_OAUTH_CLIENT_ID.to_string(),
-            token_info: None,
-            keychain_entry: None,
-        };
+        let mut auth_manager = AuthManager::new_for_tests().unwrap();
+        auth_manager.client_id = crate::config::Config::default().client_id; // Override for test
+        auth_manager.token_info = None;
 
         let result = auth_manager.get_valid_token().await;
         assert!(result.is_err());
@@ -1118,11 +1043,9 @@ mod tests {
             refresh_token_expires_at: Some(now + 7200), // Expires in 2 hours
         };
 
-        let mut auth_manager = AuthManager {
-            client_id: GITHUB_OAUTH_CLIENT_ID.to_string(),
-            token_info: Some(valid_token),
-            keychain_entry: None,
-        };
+        let mut auth_manager = AuthManager::new_for_tests().unwrap();
+        auth_manager.client_id = crate::config::Config::default().client_id; // Override for test
+        auth_manager.token_info = Some(valid_token);
 
         let result = auth_manager.get_valid_token().await;
         assert!(result.is_ok());
@@ -1137,11 +1060,9 @@ mod tests {
             refresh_token_expires_at: Some(now + 7200), // Valid refresh token
         };
 
-        let mut auth_manager = AuthManager {
-            client_id: GITHUB_OAUTH_CLIENT_ID.to_string(),
-            token_info: Some(expiring_token),
-            keychain_entry: None,
-        };
+        let mut auth_manager = AuthManager::new_for_tests().unwrap();
+        auth_manager.client_id = crate::config::Config::default().client_id; // Override for test
+        auth_manager.token_info = Some(expiring_token);
 
         // In test environment without real network, this will fail, but it will try to refresh first
         let result = auth_manager.get_valid_token().await;
@@ -1153,11 +1074,9 @@ mod tests {
     #[test]
     fn test_keychain_operations() {
         // Test keychain operations with mocked entry
-        let auth_manager = AuthManager {
-            client_id: GITHUB_OAUTH_CLIENT_ID.to_string(),
-            token_info: None,
-            keychain_entry: None, // No keychain entry for this test
-        };
+        let mut auth_manager = AuthManager::new_for_tests().unwrap();
+        auth_manager.client_id = crate::config::Config::default().client_id; // Override for test
+        auth_manager.token_info = None;
 
         // Test that operations succeed gracefully when keychain entry is not initialized
         // (tokens just won't persist between sessions)
@@ -1169,7 +1088,7 @@ mod tests {
             refresh_token_expires_at: Some(1234567890),
         };
 
-        let result = auth_manager.save_token_to_keychain(&token);
+        let result = auth_manager.save_token_to_storage(&token);
         assert!(result.is_ok()); // Should succeed even when there's no keychain
     }
 
@@ -1191,11 +1110,9 @@ mod tests {
             refresh_token_expires_at: Some(now - 100), // Expired refresh token
         };
 
-        let mut auth_manager = AuthManager {
-            client_id: GITHUB_OAUTH_CLIENT_ID.to_string(),
-            token_info: Some(expired_refresh_token),
-            keychain_entry: None,
-        };
+        let mut auth_manager = AuthManager::new_for_tests().unwrap();
+        auth_manager.client_id = crate::config::Config::default().client_id; // Override for test
+        auth_manager.token_info = Some(expired_refresh_token);
 
         let result = auth_manager.maybe_refresh_token().await;
         assert!(result.is_err());
@@ -1225,11 +1142,9 @@ mod tests {
             refresh_token_expires_at: None,
         };
 
-        let auth_manager = AuthManager {
-            client_id: GITHUB_OAUTH_CLIENT_ID.to_string(),
-            token_info: Some(no_refresh_token),
-            keychain_entry: None,
-        };
+        let mut auth_manager = AuthManager::new_for_tests().unwrap();
+        auth_manager.client_id = crate::config::Config::default().client_id; // Override for test
+        auth_manager.token_info = Some(no_refresh_token);
 
         assert!(auth_manager.is_refresh_token_expired()); // Should be true when no refresh token exists
 
@@ -1242,11 +1157,9 @@ mod tests {
             refresh_token_expires_at: Some(now + 3600), // Valid refresh token
         };
 
-        let auth_manager = AuthManager {
-            client_id: GITHUB_OAUTH_CLIENT_ID.to_string(),
-            token_info: Some(valid_refresh_token),
-            keychain_entry: None,
-        };
+        let mut auth_manager = AuthManager::new_for_tests().unwrap();
+        auth_manager.client_id = crate::config::Config::default().client_id; // Override for test
+        auth_manager.token_info = Some(valid_refresh_token);
 
         assert!(!auth_manager.is_refresh_token_expired()); // Should be false when refresh token is valid
     }
@@ -1260,18 +1173,15 @@ mod tests {
             .unwrap()
             .as_secs();
 
-        // Test initiate_reauthentication with no keychain
-        let mut auth_manager = AuthManager {
-            client_id: GITHUB_OAUTH_CLIENT_ID.to_string(),
-            token_info: Some(TokenInfo {
-                access_token: SecretString::new("old_token".to_string()),
-                token_type: "Bearer".to_string(),
-                expires_at: Some(now + 3600),
-                refresh_token: Some(SecretString::new("old_refresh_token".to_string())),
-                refresh_token_expires_at: Some(now + 7200),
-            }),
-            keychain_entry: None, // No keychain for this test
-        };
+        let mut auth_manager = AuthManager::new_for_tests().unwrap();
+        auth_manager.client_id = crate::config::Config::default().client_id; // Override for test
+        auth_manager.token_info = Some(TokenInfo {
+            access_token: SecretString::new("old_token".to_string()),
+            token_type: "Bearer".to_string(),
+            expires_at: Some(now + 3600),
+            refresh_token: Some(SecretString::new("old_refresh_token".to_string())),
+            refresh_token_expires_at: Some(now + 7200),
+        });
 
         // This should fail as authentication requires network, but method should be callable
         let result = auth_manager.initiate_reauthentication().await;
@@ -1281,11 +1191,9 @@ mod tests {
     #[tokio::test]
     async fn test_validate_token_method() {
         // Test validate_token with no token
-        let auth_manager = AuthManager {
-            client_id: GITHUB_OAUTH_CLIENT_ID.to_string(),
-            token_info: None, // No token
-            keychain_entry: None,
-        };
+        let mut auth_manager = AuthManager::new_for_tests().unwrap();
+        auth_manager.client_id = crate::config::Config::default().client_id; // Override for test
+        auth_manager.token_info = None; // No token
 
         let result = auth_manager.validate_token().await;
         // Should return Ok(false) when no token exists
@@ -1298,17 +1206,15 @@ mod tests {
             .unwrap()
             .as_secs();
 
-        let auth_manager = AuthManager {
-            client_id: GITHUB_OAUTH_CLIENT_ID.to_string(),
-            token_info: Some(TokenInfo {
-                access_token: SecretString::new("invalid_token_for_test".to_string()),
-                token_type: "Bearer".to_string(),
-                expires_at: Some(now + 3600),
-                refresh_token: Some(SecretString::new("refresh_token".to_string())),
-                refresh_token_expires_at: Some(now + 7200),
-            }),
-            keychain_entry: None,
-        };
+        let mut auth_manager = AuthManager::new_for_tests().unwrap();
+        auth_manager.client_id = crate::config::Config::default().client_id; // Override for test
+        auth_manager.token_info = Some(TokenInfo {
+            access_token: SecretString::new("invalid_token_for_test".to_string()),
+            token_type: "Bearer".to_string(),
+            expires_at: Some(now + 3600),
+            refresh_token: Some(SecretString::new("refresh_token".to_string())),
+            refresh_token_expires_at: Some(now + 7200),
+        });
 
         let result = auth_manager.validate_token().await;
         // In test environment, this will likely error due to network issues
@@ -1326,11 +1232,9 @@ mod tests {
             .as_secs();
 
         // Test with no token (should trigger initial auth)
-        let mut auth_manager = AuthManager {
-            client_id: GITHUB_OAUTH_CLIENT_ID.to_string(),
-            token_info: None,
-            keychain_entry: None,
-        };
+        let mut auth_manager = AuthManager::new_for_tests().unwrap();
+        auth_manager.client_id = crate::config::Config::default().client_id; // Override for test
+        auth_manager.token_info = None;
 
         let result = auth_manager.get_valid_token_with_reauth().await;
         assert!(result.is_err()); // Will fail without network but method should be callable
@@ -1344,11 +1248,9 @@ mod tests {
             refresh_token_expires_at: Some(now - 50), // Also expired
         };
 
-        let mut auth_manager = AuthManager {
-            client_id: GITHUB_OAUTH_CLIENT_ID.to_string(),
-            token_info: Some(expired_token),
-            keychain_entry: None,
-        };
+        let mut auth_manager = AuthManager::new_for_tests().unwrap();
+        auth_manager.client_id = crate::config::Config::default().client_id; // Override for test
+        auth_manager.token_info = Some(expired_token);
 
         let result = auth_manager.get_valid_token_with_reauth().await;
         assert!(result.is_err()); // Will fail without network but should follow the right logic path

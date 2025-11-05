@@ -36,60 +36,29 @@ async fn main() -> Result<(), AuthError> {
 
     let mut auth_manager = AuthManager::new()?;
 
-    // Try to load existing token from keychain and ensure it's valid
-    if let Ok(Some(token_info)) = auth_manager.load_token_from_keychain() {
-        tracing::info!("Found existing token in keychain");
-        auth_manager.token_info = Some(token_info);
+    // Load token from storage before attempting to get a valid token
+    auth_manager.load_token_from_storage()?;
 
-        // Use the comprehensive token management - handles validation, refresh, and re-auth
-        match auth_manager.get_valid_token_with_reauth().await {
-            Ok(_) => {
-                tracing::info!("Token is valid and ready for use");
-                println!(
-                    "Token is valid and ready for use. The application is now running in the background."
-                );
-                println!("It will continuously check GitHub for new notifications.");
-                println!("Press Ctrl+C to stop the application.");
-            }
-            Err(e) => {
-                tracing::error!("Failed to get valid token: {}", e);
-                eprintln!(
-                    "Failed to validate existing token. This may be due to an invalid or unconfigured GitHub OAuth client ID."
-                );
-                eprintln!(
-                    "The existing token may be invalid, or the client ID may need to be updated."
-                );
-                eprintln!(
-                    "Please check your configuration and ensure you have a valid client_id set."
-                );
-                std::process::exit(1);
-            }
+    // Try to load existing token from keychain and ensure it's valid
+    match auth_manager.get_valid_token_with_reauth().await {
+        Ok(_) => {
+            tracing::info!("Token is valid and ready for use");
+            println!(
+                "Token is valid and ready for use. The application is now running in the background."
+            );
+            println!("It will continuously check GitHub for new notifications.");
+            println!("Press Ctrl+C to stop the application.");
         }
-    } else {
-        tracing::info!("No existing token found, starting OAuth Device Flow...");
-        // Perform the OAuth device flow to get a new token
-        match auth_manager.get_valid_token_with_reauth().await {
-            Ok(_) => {
-                tracing::info!("Authentication successful!");
-                println!(
-                    "Authentication successful! The application is now running in the background."
-                );
-                println!("It will continuously check GitHub for new notifications.");
-                println!("Press Ctrl+C to stop the application.");
-            }
-            Err(e) => {
-                tracing::error!("Authentication failed: {}", e);
-                eprintln!(
-                    "Authentication failed. This may be due to an invalid or unconfigured GitHub OAuth client ID."
-                );
-                eprintln!(
-                    "Please ensure you have a valid client_id configured in your config file."
-                );
-                eprintln!(
-                    "To configure your own client ID, register a GitHub OAuth App and set the 'client_id' in the config file."
-                );
-                std::process::exit(1);
-            }
+        Err(e) => {
+            tracing::error!("Failed to get valid token: {}", e);
+            eprintln!(
+                "Failed to validate existing token. This may be due to an invalid or unconfigured GitHub OAuth client ID."
+            );
+            eprintln!(
+                "The existing token may be invalid, or the client ID may need to be updated."
+            );
+            eprintln!("Please check your configuration and ensure you have a valid client_id set.");
+            std::process::exit(1);
         }
     }
 
