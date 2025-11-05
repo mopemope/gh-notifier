@@ -18,13 +18,16 @@ Rustで構築された軽量デーモンアプリケーションで、GitHub通�
 
 アプリケーションは以下の主要コンポーネントで構成されています：
 
-- `ConfigLoader` - TOMLファイルからの設定読み込み
+- `Config` - TOMLファイルからの設定読み込みと管理
 - `AuthManager` - OAuth Device Flowの処理、トークンの保存と更新、OSキーチェーン操作
 - `GitHubClient` - 認証済みHTTPクライアント（自動トークン付与）
-- `Poller` - 通知ポーリングと新規通知の検出
+- `Poller` - 通知ポーリングと通知送信
 - `Notifier` - OS依存の通知送信
 - `StateManager` - ETagと最終取得時刻の管理
 - `Logger` - `tracing`ベースの構造化ログ
+- `Polling Module` - 通知のフィルタリング、処理、ポーリングループの実行をそれぞれ別々に管理（filter.rs, handler.rs, runner.rs）
+- `InitializationService` - アプリケーションの初期化処理
+- `Shutdown` - シグナルハンドリングによる安全なシャットダウン処理
 
 ## インストール
 
@@ -95,6 +98,28 @@ poll_interval_sec = 30                    # 通知ポーリング間隔（秒）
 mark_as_read_on_notify = false           # 通知表示時に既読にするか
 client_id = "Iv1.898a6d2a86c3f7aa"      # GitHub OAuth App Client ID
 log_level = "info"                       # ログレベル（info, debug, warn, error）
+log_file_path = ""                       # ログファイルの保存パス（省略可能）
+
+# 通知フィルタリング設定（デフォルトでは自分宛てのPRレビュー依頼のみ通知）
+[notification_filters]
+include_reasons = ["review_requested"]     # 受け取る通知理由（レビュー依頼のみ）
+include_subject_types = ["PullRequest"]    # 受け取る通知タイプ（プルリクエストのみ）
+exclude_repositories = []                  # 除外するリポジトリのリスト
+exclude_reasons = []                       # 除外する通知理由のリスト
+exclude_draft_prs = false                  # ドラフトPRの通知を除外するかどうか
+exclude_private_repos = false              # プライベートリポジトリの通知を除外するかどうか
+exclude_fork_repos = false                 # フォークリポジトリの通知を除外するかどうか
+exclude_participating = false              # 参加しているスレッドの通知を除外するかどうか
+
+# 通知バッチ処理設定（バッチ処理を無効にするにはbatch_size = 0）
+[notification_batch_config]
+batch_size = 0                           # 通知バッチの最大数（0で無効）
+batch_interval_sec = 30                  # バッチ処理の間隔（秒）
+
+# ポーリングエラーハンドリング設定
+[polling_error_handling_config]
+retry_count = 3                          # エラー発生時の再試行回数
+retry_interval_sec = 5                   # 再試行間隔（秒）
 
 # 通知フィルタリング設定（デフォルトでは自分宛てのPRレビュー依頼のみ通知）
 [notification_filters]
@@ -180,11 +205,24 @@ exclude_private_repos = false
 exclude_draft_prs = true  # ドラフト状態のプルリクエストの通知を除外
 ```
 
+### フォークリポジトリの通知を除外
+```toml
+[notification_filters]
+exclude_fork_repos = true  # フォークリポジトリからの通知を除外
+```
+
+### 参加しているスレッドの通知を除外
+```toml
+[notification_filters]
+exclude_participating = true  # 自分が参加しているスレッドの通知を除外
+```
+
 ## 設定オプションの詳細
 
 - `poll_interval_sec`: GitHub APIから通知をポーリングする間隔（秒単位）。デフォルトは30秒。
 - `mark_as_read_on_notify`: trueにすると、通知表示時に自動的にGitHub上で通知を既読に設定します。
 - `log_level`: ログの詳細度（info, debug, warn, error）。デフォルトはinfo。
+- `log_file_path`: ログファイルの保存パス（省略可能、デフォルト: データディレクトリ下の logs/gh-notifier.log）
 - `client_id`: GitHub OAuthアプリケーションのクライアントID。デフォルトは組み込みのID。
 
 ### 通知フィルタリングオプション
@@ -195,6 +233,7 @@ exclude_draft_prs = true  # ドラフト状態のプルリクエストの通知�
 - `include_organizations`: 通知を受け取りたい組織のリスト（指定された組織のリポジトリからのみ通知を受信）
 - `exclude_organizations`: 通知を受け取りたくない組織のリスト
 - `exclude_private_repos`: trueにすると、プライベートリポジトリからの通知を除外します
+- `exclude_fork_repos`: trueにすると、フォークリポジトリからの通知を除外します
 
 #### 通知タイプベースのフィルタリング
 - `include_subject_types`: 通知を受け取りたい通知タイプのリスト（例: "Issue", "PullRequest", "Commit", "Release"）
@@ -210,6 +249,7 @@ exclude_draft_prs = true  # ドラフト状態のプルリクエストの通知�
 #### 高度なフィルタリング
 - `minimum_updated_time`: 通知の最小更新時間（例: "1h", "30m", "2d"）。この時間より古い通知は除外されます
 - `exclude_draft_prs`: ドラフト状態のプルリクエストの通知を除外するかどうか（trueにするとドラフトPRの通知が表示されません）
+- `exclude_participating`: 参加しているスレッドの通知を除外するかどうか（trueにすると自分が参加したスレッドからの通知を除外します）
 
 #### 通知理由の種類 (Reasons)
 通知のフィルタリングで使用できる理由の種類:
@@ -238,10 +278,14 @@ exclude_draft_prs = true  # ドラフト状態のプルリクエストの通知�
 
 - **ポーリング方式**: ETagおよびIf-Modified-Sinceヘッダーを使用した効率的なポーリングを行うGitHub REST API v3 `/notifications`エンドポイント
 - **認証スコープ**: 通知の読み取りに`notifications`スコープが必要、既読に設定する場合はオプションで`repo`スコープ
-- **ログ**: `tracing`クレートによる構造化ログ
+- **ログ**: `tracing`クレートによる構造化ログ（ファイル出力もサポート）
 - **非同期ランタイム**: 非同期操作のためのTokioベース
 - **シャットダウン処理**: SIGINT/SIGTERMシグナルをキャッチして安全に終了するイベントループ
 - **タスク管理**: `tokio::spawn`を使用した非同期タスクの実行
+- **トークン管理**: トークンの有効期限が切れる5分前までに自動的に更新（予防的リフレッシュ）
+- **フィルタリング**: 様々なフィルタリング条件に基づいた高度な通知フィルタリング
+- **バッチ処理**: 通知のバッチ処理機能（設定可能なバッチサイズと間隔）
+- **エラーハンドリング**: ポーリングエラーに対する再試行ロジック（設定可能な回数と間隔）
 
 ## トラブルシューティング
 
