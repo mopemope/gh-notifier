@@ -96,10 +96,12 @@ mark_as_read_on_notify = false           # 通知表示時に既読にするか
 client_id = "Iv1.898a6d2a86c3f7aa"      # GitHub OAuth App Client ID
 log_level = "info"                       # ログレベル（info, debug, warn, error）
 
-# 通知フィルタリング設定の例
+# 通知フィルタリング設定（デフォルトでは自分宛てのPRレビュー依頼のみ通知）
 [notification_filters]
-exclude_repositories = []                # 除外するリポジトリのリスト
-exclude_reasons = []                     # 除外する通知理由のリスト
+include_reasons = ["review_requested"]     # 受け取る通知理由（レビュー依頼のみ）
+include_subject_types = ["PullRequest"]    # 受け取る通知タイプ（プルリクエストのみ）
+exclude_repositories = []                  # 除外するリポジトリのリスト
+exclude_reasons = []                       # 除外する通知理由のリスト
 
 # 通知バッチ処理設定（バッチ処理を無効にするにはbatch_size = 0）
 [notification_batch_config]
@@ -110,6 +112,65 @@ batch_interval_sec = 30                  # バッチ処理の間隔（秒）
 [polling_error_handling_config]
 retry_count = 3                          # エラー発生時の再試行回数
 retry_interval_sec = 5                   # 再試行間隔（秒）
+```
+
+## 設定例
+
+### 自分宛てのPRレビュー依頼のみを通知（デフォルト）
+```toml
+[notification_filters]
+include_reasons = ["review_requested"]
+include_subject_types = ["PullRequest"]
+```
+
+### すべてのメンションとPRレビュー依頼を通知
+```toml
+[notification_filters]
+include_reasons = ["mention", "review_requested"]
+include_subject_types = ["Issue", "PullRequest"]
+```
+
+### 特定のリポジトリからの通知のみを受け取る
+```toml
+[notification_filters]
+include_repositories = [
+  "your-org/important-project",
+  "your-org/another-project"
+]
+```
+
+### 自分が所属する組織からの通知のみを受け取る
+```toml
+[notification_filters]
+include_organizations = ["your-org"]
+```
+
+### 特定キーワードを含む通知のみを受け取る
+```toml
+[notification_filters]
+title_contains = ["urgent", "critical", "bug"]
+```
+
+### プライベートリポジトリの通知を除外
+```toml
+[notification_filters]
+exclude_private_repos = true
+```
+
+### 最近24時間以内の通知のみを受け取る
+```toml
+[notification_filters]
+minimum_updated_time = "24h"
+```
+
+### 複合フィルター例（レビュー依頼 + 重要なキーワード + 指定リポジトリのみ）
+```toml
+[notification_filters]
+include_reasons = ["review_requested"]
+include_subject_types = ["PullRequest"]
+title_contains = ["important", "critical"]
+include_repositories = ["important-org/main-repo"]
+exclude_private_repos = false
 ```
 
 ## 設定オプションの詳細

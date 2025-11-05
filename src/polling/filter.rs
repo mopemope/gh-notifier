@@ -287,6 +287,7 @@ mod tests {
 
     #[test]
     fn test_filter_new_notifications() {
+        use crate::config::NotificationFilter;
         let old_time = "2023-01-01T00:00:00Z";
         let new_time = "2023-01-02T00:00:00Z";
 
@@ -340,7 +341,9 @@ mod tests {
         let mut state_manager = StateManager::new().unwrap();
         state_manager.update_last_checked_at(old_time.to_string());
 
-        let config = Config::default();
+        // Use a config with no filters to allow all notifications
+        let mut config = Config::default();
+        config.notification_filters = NotificationFilter::default();
         let new_notifications = filter_new_notifications(&notifications, &state_manager, &config);
 
         assert_eq!(new_notifications.len(), 1);
@@ -349,6 +352,7 @@ mod tests {
 
     #[test]
     fn test_filter_new_notifications_with_config() {
+        use crate::config::NotificationFilter;
         let old_time = "2023-01-01T00:00:00Z";
         let new_time = "2023-01-02T00:00:00Z";
 
@@ -403,6 +407,8 @@ mod tests {
         state_manager.update_last_checked_at(old_time.to_string());
 
         let mut config = Config::default();
+        // Reset notification filters to allow the test to work as expected
+        config.notification_filters = NotificationFilter::default();
         config
             .notification_filters
             .exclude_reasons
@@ -416,6 +422,7 @@ mod tests {
 
     #[test]
     fn test_include_repositories_filter() {
+        use crate::config::NotificationFilter;
         let new_time = "2023-01-02T00:00:00Z";
 
         let notifications = vec![
@@ -469,6 +476,8 @@ mod tests {
         state_manager.update_last_checked_at("2023-01-01T00:00:00Z".to_string());
 
         let mut config = Config::default();
+        // Reset notification filters to allow the test to work as expected
+        config.notification_filters = NotificationFilter::default();
         config
             .notification_filters
             .include_repositories
@@ -482,6 +491,7 @@ mod tests {
 
     #[test]
     fn test_exclude_private_repos_filter() {
+        use crate::config::NotificationFilter;
         let new_time = "2023-01-02T00:00:00Z";
 
         let notifications = vec![
@@ -535,6 +545,8 @@ mod tests {
         state_manager.update_last_checked_at("2023-01-01T00:00:00Z".to_string());
 
         let mut config = Config::default();
+        // Reset notification filters to allow the test to work as expected
+        config.notification_filters = NotificationFilter::default();
         config.notification_filters.exclude_private_repos = true;
 
         let new_notifications = filter_new_notifications(&notifications, &state_manager, &config);
@@ -545,6 +557,7 @@ mod tests {
 
     #[test]
     fn test_title_contains_filter() {
+        use crate::config::NotificationFilter;
         let new_time = "2023-01-02T00:00:00Z";
 
         let notifications = vec![
@@ -598,6 +611,8 @@ mod tests {
         state_manager.update_last_checked_at("2023-01-01T00:00:00Z".to_string());
 
         let mut config = Config::default();
+        // Reset notification filters to allow the test to work as expected
+        config.notification_filters = NotificationFilter::default();
         config
             .notification_filters
             .title_contains
