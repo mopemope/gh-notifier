@@ -121,23 +121,7 @@ batch_interval_sec = 30                  # バッチ処理の間隔（秒）
 retry_count = 3                          # エラー発生時の再試行回数
 retry_interval_sec = 5                   # 再試行間隔（秒）
 
-# 通知フィルタリング設定（デフォルトでは自分宛てのPRレビュー依頼のみ通知）
-[notification_filters]
-include_reasons = ["review_requested"]     # 受け取る通知理由（レビュー依頼のみ）
-include_subject_types = ["PullRequest"]    # 受け取る通知タイプ（プルリクエストのみ）
-exclude_repositories = []                  # 除外するリポジトリのリスト
-exclude_reasons = []                       # 除外する通知理由のリスト
-exclude_draft_prs = false                  # ドラフトPRの通知を除外するかどうか
 
-# 通知バッチ処理設定（バッチ処理を無効にするにはbatch_size = 0）
-[notification_batch_config]
-batch_size = 0                           # 通知バッチの最大数（0で無効）
-batch_interval_sec = 30                  # バッチ処理の間隔（秒）
-
-# ポーリングエラーハンドリング設定
-[polling_error_handling_config]
-retry_count = 3                          # エラー発生時の再試行回数
-retry_interval_sec = 5                   # 再試行間隔（秒）
 ```
 
 ## 設定例
@@ -214,7 +198,7 @@ exclude_fork_repos = true  # フォークリポジトリからの通知を除外
 ### 参加しているスレッドの通知を除外
 ```toml
 [notification_filters]
-exclude_participating = true  # 自分が参加しているスレッドの通知を除外
+exclude_participating = true  # 自分が参加しているスレッドの通知を除外（現在のところ完全には実装されていません）
 ```
 
 ## 設定オプションの詳細
@@ -249,7 +233,7 @@ exclude_participating = true  # 自分が参加しているスレッドの通知
 #### 高度なフィルタリング
 - `minimum_updated_time`: 通知の最小更新時間（例: "1h", "30m", "2d"）。この時間より古い通知は除外されます
 - `exclude_draft_prs`: ドラフト状態のプルリクエストの通知を除外するかどうか（trueにするとドラフトPRの通知が表示されません）
-- `exclude_participating`: 参加しているスレッドの通知を除外するかどうか（trueにすると自分が参加したスレッドからの通知を除外します）
+- `exclude_participating`: 参加しているスレッドの通知を除外するかどうか（現在のところ完全には実装されていません。GitHub APIの通知レスポンスにはparticipatingフィールドが含まれないため、機能は定義されていますが実際には動作しません）
 
 #### 通知理由の種類 (Reasons)
 通知のフィルタリングで使用できる理由の種類:

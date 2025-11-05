@@ -1,6 +1,8 @@
 pub mod filter;
+pub mod filters;
 pub mod handler;
 pub mod runner;
+pub mod utils;
 
 pub use filter::filter_new_notifications;
 pub use handler::handle_notification;

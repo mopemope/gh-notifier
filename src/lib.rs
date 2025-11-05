@@ -1,4 +1,5 @@
 pub mod app;
+pub mod auth;
 pub mod auth_manager;
 pub mod config;
 pub mod errors;
@@ -16,7 +17,7 @@ pub mod token_storage;
 pub mod traits;
 
 pub use app::Application;
-pub use auth_manager::AuthManager;
+pub use auth::AuthManager;
 pub use config::Config;
 pub use errors::AuthError;
 pub use github_client::GitHubClient;
