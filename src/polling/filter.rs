@@ -283,7 +283,10 @@ fn parse_duration(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Config, Notification, NotificationRepository, NotificationSubject, StateManager};
+    use crate::{
+        Config, Notification, NotificationRepository, NotificationSubject, StateManager,
+        config::NotificationFilter,
+    };
 
     #[test]
     fn test_filter_new_notifications() {
@@ -658,5 +661,450 @@ mod tests {
         assert_eq!(extract_org_name("user/project"), "user");
         assert_eq!(extract_org_name("single"), "single");
         assert_eq!(extract_org_name(""), "");
+    }
+
+    #[test]
+    fn test_include_organizations_filter() {
+        let new_time = "2023-01-02T00:00:00Z";
+
+        let notifications = vec![
+            Notification {
+                id: "1".to_string(),
+                unread: true,
+                reason: "review_requested".to_string(),
+                updated_at: new_time.to_string(),
+                last_read_at: None,
+                subject: NotificationSubject {
+                    title: "PR notification 1".to_string(),
+                    url: Some("https://example.com/1".to_string()),
+                    latest_comment_url: None,
+                    kind: "PullRequest".to_string(),
+                },
+                repository: NotificationRepository {
+                    id: 1,
+                    node_id: "node1".to_string(),
+                    name: "repo1".to_string(),
+                    full_name: "myorg/repo1".to_string(), // myorg
+                    private: false,
+                },
+                url: "https://example.com/1".to_string(),
+                subscription_url: "https://example.com/subscription/1".to_string(),
+            },
+            Notification {
+                id: "2".to_string(),
+                unread: true,
+                reason: "review_requested".to_string(),
+                updated_at: new_time.to_string(),
+                last_read_at: None,
+                subject: NotificationSubject {
+                    title: "PR notification 2".to_string(),
+                    url: Some("https://example.com/2".to_string()),
+                    latest_comment_url: None,
+                    kind: "PullRequest".to_string(),
+                },
+                repository: NotificationRepository {
+                    id: 2,
+                    node_id: "node2".to_string(),
+                    name: "repo2".to_string(),
+                    full_name: "otherorg/repo2".to_string(), // otherorg
+                    private: false,
+                },
+                url: "https://example.com/2".to_string(),
+                subscription_url: "https://example.com/subscription/2".to_string(),
+            },
+        ];
+
+        let mut state_manager = StateManager::new().unwrap();
+        state_manager.update_last_checked_at("2023-01-01T00:00:00Z".to_string());
+
+        let mut config = Config::default();
+        // Reset notification filters to allow the test to work as expected
+        config.notification_filters = NotificationFilter::default();
+        // Clear include filters so all notifications are considered
+        config.notification_filters.include_reasons = vec![];
+        config.notification_filters.include_subject_types = vec![];
+        config
+            .notification_filters
+            .include_organizations
+            .push("myorg".to_string());
+
+        let new_notifications = filter_new_notifications(&notifications, &state_manager, &config);
+
+        assert_eq!(new_notifications.len(), 1);
+        assert_eq!(new_notifications[0].id, "1");
+    }
+
+    #[test]
+    fn test_exclude_organizations_filter() {
+        let new_time = "2023-01-02T00:00:00Z";
+
+        let notifications = vec![
+            Notification {
+                id: "1".to_string(),
+                unread: true,
+                reason: "review_requested".to_string(),
+                updated_at: new_time.to_string(),
+                last_read_at: None,
+                subject: NotificationSubject {
+                    title: "PR notification 1".to_string(),
+                    url: Some("https://example.com/1".to_string()),
+                    latest_comment_url: None,
+                    kind: "PullRequest".to_string(),
+                },
+                repository: NotificationRepository {
+                    id: 1,
+                    node_id: "node1".to_string(),
+                    name: "repo1".to_string(),
+                    full_name: "spamorg/repo1".to_string(), // spamorg
+                    private: false,
+                },
+                url: "https://example.com/1".to_string(),
+                subscription_url: "https://example.com/subscription/1".to_string(),
+            },
+            Notification {
+                id: "2".to_string(),
+                unread: true,
+                reason: "review_requested".to_string(),
+                updated_at: new_time.to_string(),
+                last_read_at: None,
+                subject: NotificationSubject {
+                    title: "PR notification 2".to_string(),
+                    url: Some("https://example.com/2".to_string()),
+                    latest_comment_url: None,
+                    kind: "PullRequest".to_string(),
+                },
+                repository: NotificationRepository {
+                    id: 2,
+                    node_id: "node2".to_string(),
+                    name: "repo2".to_string(),
+                    full_name: "goodorg/repo2".to_string(), // goodorg
+                    private: false,
+                },
+                url: "https://example.com/2".to_string(),
+                subscription_url: "https://example.com/subscription/2".to_string(),
+            },
+        ];
+
+        let mut state_manager = StateManager::new().unwrap();
+        state_manager.update_last_checked_at("2023-01-01T00:00:00Z".to_string());
+
+        let mut config = Config::default();
+        // Reset notification filters to allow the test to work as expected
+        config.notification_filters = NotificationFilter::default();
+        // Clear include filters so all notifications are considered
+        config.notification_filters.include_reasons = vec![];
+        config.notification_filters.include_subject_types = vec![];
+        config
+            .notification_filters
+            .exclude_organizations
+            .push("spamorg".to_string());
+
+        let new_notifications = filter_new_notifications(&notifications, &state_manager, &config);
+
+        assert_eq!(new_notifications.len(), 1);
+        assert_eq!(new_notifications[0].id, "2");
+    }
+
+    #[test]
+    fn test_exclude_subject_types_filter() {
+        let new_time = "2023-01-02T00:00:00Z";
+
+        let notifications = vec![
+            Notification {
+                id: "1".to_string(),
+                unread: true,
+                reason: "review_requested".to_string(),
+                updated_at: new_time.to_string(),
+                last_read_at: None,
+                subject: NotificationSubject {
+                    title: "PR notification".to_string(),
+                    url: Some("https://example.com/1".to_string()),
+                    latest_comment_url: None,
+                    kind: "PullRequest".to_string(), // This should be excluded
+                },
+                repository: NotificationRepository {
+                    id: 1,
+                    node_id: "node1".to_string(),
+                    name: "repo1".to_string(),
+                    full_name: "user/repo1".to_string(),
+                    private: false,
+                },
+                url: "https://example.com/1".to_string(),
+                subscription_url: "https://example.com/subscription/1".to_string(),
+            },
+            Notification {
+                id: "2".to_string(),
+                unread: true,
+                reason: "mention".to_string(),
+                updated_at: new_time.to_string(),
+                last_read_at: None,
+                subject: NotificationSubject {
+                    title: "Issue notification".to_string(),
+                    url: Some("https://example.com/2".to_string()),
+                    latest_comment_url: None,
+                    kind: "Issue".to_string(), // This should pass through
+                },
+                repository: NotificationRepository {
+                    id: 2,
+                    node_id: "node2".to_string(),
+                    name: "repo2".to_string(),
+                    full_name: "user/repo2".to_string(),
+                    private: false,
+                },
+                url: "https://example.com/2".to_string(),
+                subscription_url: "https://example.com/subscription/2".to_string(),
+            },
+        ];
+
+        let mut state_manager = StateManager::new().unwrap();
+        state_manager.update_last_checked_at("2023-01-01T00:00:00Z".to_string());
+
+        let mut config = Config::default();
+        // Reset notification filters to allow the test to work as expected
+        config.notification_filters = NotificationFilter::default();
+        // Clear include filters so all notifications are considered
+        config.notification_filters.include_reasons = vec![];
+        config.notification_filters.include_subject_types = vec![];
+        config
+            .notification_filters
+            .exclude_subject_types
+            .push("PullRequest".to_string());
+
+        let new_notifications = filter_new_notifications(&notifications, &state_manager, &config);
+
+        assert_eq!(new_notifications.len(), 1);
+        assert_eq!(new_notifications[0].id, "2");
+    }
+
+    #[test]
+    fn test_title_not_contains_filter() {
+        let new_time = "2023-01-02T00:00:00Z";
+
+        let notifications = vec![
+            Notification {
+                id: "1".to_string(),
+                unread: true,
+                reason: "review_requested".to_string(), // Use review_requested to match default config
+                updated_at: new_time.to_string(),
+                last_read_at: None,
+                subject: NotificationSubject {
+                    title: "This title has spam in it".to_string(),
+                    url: Some("https://example.com/1".to_string()),
+                    latest_comment_url: None,
+                    kind: "PullRequest".to_string(), // Use PullRequest to match default config
+                },
+                repository: NotificationRepository {
+                    id: 1,
+                    node_id: "node1".to_string(),
+                    name: "repo1".to_string(),
+                    full_name: "user/repo1".to_string(),
+                    private: false,
+                },
+                url: "https://example.com/1".to_string(),
+                subscription_url: "https://example.com/subscription/1".to_string(),
+            },
+            Notification {
+                id: "2".to_string(),
+                unread: true,
+                reason: "review_requested".to_string(), // Use review_requested to match default config
+                updated_at: new_time.to_string(),
+                last_read_at: None,
+                subject: NotificationSubject {
+                    title: "Clean title without the bad word".to_string(),
+                    url: Some("https://example.com/2".to_string()),
+                    latest_comment_url: None,
+                    kind: "PullRequest".to_string(), // Use PullRequest to match default config
+                },
+                repository: NotificationRepository {
+                    id: 2,
+                    node_id: "node2".to_string(),
+                    name: "repo2".to_string(),
+                    full_name: "user/repo2".to_string(),
+                    private: false,
+                },
+                url: "https://example.com/2".to_string(),
+                subscription_url: "https://example.com/subscription/2".to_string(),
+            },
+        ];
+
+        let mut state_manager = StateManager::new().unwrap();
+        state_manager.update_last_checked_at("2023-01-01T00:00:00Z".to_string());
+
+        let mut config = Config::default();
+        // Reset notification filters to allow the test to work as expected
+        config.notification_filters = NotificationFilter::default();
+        // Clear include filters so all notifications are considered
+        config.notification_filters.include_reasons = vec![];
+        config.notification_filters.include_subject_types = vec![];
+        config
+            .notification_filters
+            .title_not_contains
+            .push("spam".to_string());
+
+        let new_notifications = filter_new_notifications(&notifications, &state_manager, &config);
+
+        assert_eq!(new_notifications.len(), 1);
+        assert_eq!(new_notifications[0].id, "2");
+    }
+
+    #[test]
+    fn test_repository_contains_filter() {
+        let new_time = "2023-01-02T00:00:00Z";
+
+        let notifications = vec![
+            Notification {
+                id: "1".to_string(),
+                unread: true,
+                reason: "mention".to_string(),
+                updated_at: new_time.to_string(),
+                last_read_at: None,
+                subject: NotificationSubject {
+                    title: "Notification 1".to_string(),
+                    url: Some("https://example.com/1".to_string()),
+                    latest_comment_url: None,
+                    kind: "Issue".to_string(),
+                },
+                repository: NotificationRepository {
+                    id: 1,
+                    node_id: "node1".to_string(),
+                    name: "main-project".to_string(),
+                    full_name: "user/main-project".to_string(), // contains "main"
+                    private: false,
+                },
+                url: "https://example.com/1".to_string(),
+                subscription_url: "https://example.com/subscription/1".to_string(),
+            },
+            Notification {
+                id: "2".to_string(),
+                unread: true,
+                reason: "comment".to_string(),
+                updated_at: new_time.to_string(),
+                last_read_at: None,
+                subject: NotificationSubject {
+                    title: "Notification 2".to_string(),
+                    url: Some("https://example.com/2".to_string()),
+                    latest_comment_url: None,
+                    kind: "Issue".to_string(),
+                },
+                repository: NotificationRepository {
+                    id: 2,
+                    node_id: "node2".to_string(),
+                    name: "other-repo".to_string(),
+                    full_name: "user/other-repo".to_string(), // does not contain "main"
+                    private: false,
+                },
+                url: "https://example.com/2".to_string(),
+                subscription_url: "https://example.com/subscription/2".to_string(),
+            },
+        ];
+
+        let mut state_manager = StateManager::new().unwrap();
+        state_manager.update_last_checked_at("2023-01-01T00:00:00Z".to_string());
+
+        let mut config = Config::default();
+        // Reset notification filters to allow the test to work as expected
+        config.notification_filters = NotificationFilter::default();
+        // Clear include filters so all notifications are considered
+        config.notification_filters.include_reasons = vec![];
+        config.notification_filters.include_subject_types = vec![];
+        config
+            .notification_filters
+            .repository_contains
+            .push("main".to_string());
+
+        let new_notifications = filter_new_notifications(&notifications, &state_manager, &config);
+
+        assert_eq!(new_notifications.len(), 1);
+        assert_eq!(new_notifications[0].id, "1");
+    }
+
+    #[test]
+    fn test_combined_filters() {
+        let new_time = "2023-01-02T00:00:00Z";
+
+        let notifications = vec![
+            Notification {
+                id: "1".to_string(),
+                unread: true,
+                reason: "review_requested".to_string(),
+                updated_at: new_time.to_string(),
+                last_read_at: None,
+                subject: NotificationSubject {
+                    title: "Urgent PR Review".to_string(),
+                    url: Some("https://example.com/1".to_string()),
+                    latest_comment_url: None,
+                    kind: "PullRequest".to_string(),
+                },
+                repository: NotificationRepository {
+                    id: 1,
+                    node_id: "node1".to_string(),
+                    name: "important-project".to_string(),
+                    full_name: "user/important-project".to_string(),
+                    private: false,
+                },
+                url: "https://example.com/1".to_string(),
+                subscription_url: "https://example.com/subscription/1".to_string(),
+            },
+            Notification {
+                id: "2".to_string(),
+                unread: true,
+                reason: "mention".to_string(), // Not review_requested
+                updated_at: new_time.to_string(),
+                last_read_at: None,
+                subject: NotificationSubject {
+                    title: "Urgent notification".to_string(), // Contains "urgent"
+                    url: Some("https://example.com/2".to_string()),
+                    latest_comment_url: None,
+                    kind: "Issue".to_string(), // Not PullRequest
+                },
+                repository: NotificationRepository {
+                    id: 2,
+                    node_id: "node2".to_string(),
+                    name: "other-project".to_string(),
+                    full_name: "user/other-project".to_string(),
+                    private: false,
+                },
+                url: "https://example.com/2".to_string(),
+                subscription_url: "https://example.com/subscription/2".to_string(),
+            },
+            Notification {
+                id: "3".to_string(),
+                unread: true,
+                reason: "review_requested".to_string(),
+                updated_at: new_time.to_string(),
+                last_read_at: None,
+                subject: NotificationSubject {
+                    title: "Normal PR Review".to_string(),
+                    url: Some("https://example.com/3".to_string()),
+                    latest_comment_url: None,
+                    kind: "PullRequest".to_string(),
+                },
+                repository: NotificationRepository {
+                    id: 3,
+                    node_id: "node3".to_string(),
+                    name: "normal-project".to_string(),
+                    full_name: "user/normal-project".to_string(),
+                    private: false,
+                },
+                url: "https://example.com/3".to_string(),
+                subscription_url: "https://example.com/subscription/3".to_string(),
+            },
+        ];
+
+        let mut state_manager = StateManager::new().unwrap();
+        state_manager.update_last_checked_at("2023-01-01T00:00:00Z".to_string());
+
+        let mut config = Config::default();
+        // Reset notification filters to allow the test to work as expected
+        config.notification_filters = NotificationFilter::default();
+        // For this test, we want to set specific include filters to test combination
+        config.notification_filters.include_reasons = vec!["review_requested".to_string()];
+        config.notification_filters.include_subject_types = vec!["PullRequest".to_string()];
+        config.notification_filters.title_contains = vec!["urgent".to_string()];
+
+        let new_notifications = filter_new_notifications(&notifications, &state_manager, &config);
+
+        assert_eq!(new_notifications.len(), 1);
+        assert_eq!(new_notifications[0].id, "1"); // Only notification 1 matches all criteria
     }
 }
