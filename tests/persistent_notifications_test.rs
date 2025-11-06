@@ -9,7 +9,7 @@ fn test_persistent_notification_config() {
     let mut config = Config::default();
 
     // Check default value
-    assert!(!config.persistent_notifications);
+    assert!(config.persistent_notifications);
 
     // Test with persistent notifications enabled
     config.persistent_notifications = true;

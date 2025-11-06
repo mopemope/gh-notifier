@@ -153,7 +153,12 @@ async fn perform_notification_recovery(
                         let _ = initialized_app
                             .history_manager
                             .mark_as_read(&notification.id)
-                            .map_err(|e| tracing::warn!("Failed to mark recovered notification as read: {}", e));
+                            .map_err(|e| {
+                                tracing::warn!(
+                                    "Failed to mark recovered notification as read: {}",
+                                    e
+                                )
+                            });
                     }
                 }
             }
