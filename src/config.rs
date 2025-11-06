@@ -202,7 +202,7 @@ fn default_log_level() -> String {
 }
 
 fn default_persistent_notifications() -> bool {
-    false // デフォルトでは現在の挙動（自動消去）を維持
+    true // デフォルトで通知を永続的に表示
 }
 
 fn default_api_enabled() -> bool {
