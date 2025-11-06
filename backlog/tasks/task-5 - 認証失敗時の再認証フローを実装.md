@@ -1,6 +1,6 @@
 ---
 id: task-5
-title: 認証失敗時の再認証フローを実装
+title: PAT無効時のエラーハンドリングを実装
 status: Done
 assignee: []
 created_date: '2025-10-31 11:24'
@@ -16,10 +16,10 @@ priority: medium
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-トークンが無効または期限切れで再認証が必要な場合、ユーザーに再認証プロセスを促す機能を実装する。
+PAT が無効な場合、エラーメッセージを表示して設定ファイルの更新を促す機能を実装する。
 
 主な機能:
-- 無効なトークン検出
-- 再認証必要性の通知
-- OAuth Device Flow 再実行
+- 無効なPAT検出
+- エラーメッセージ表示
+- 設定ファイル更新の案内
 <!-- SECTION:DESCRIPTION:END -->

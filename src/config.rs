@@ -143,6 +143,10 @@ pub struct Config {
     #[serde(default = "default_mark_as_read_on_notify")]
     pub mark_as_read_on_notify: bool,
 
+    /// GitHub Personal Access Token (Classic PAT)
+    #[serde(default)]
+    pub pat: Option<String>,
+
     /// 通知フィルタの設定
     #[serde(default)]
     pub notification_filters: NotificationFilter,
@@ -187,6 +191,7 @@ impl Default for Config {
         Config {
             poll_interval_sec: default_poll_interval_sec(),
             mark_as_read_on_notify: default_mark_as_read_on_notify(),
+            pat: None,
             notification_filters,
             notification_batch_config: NotificationBatchConfig::default(),
             polling_error_handling_config: PollingErrorHandlingConfig::default(),

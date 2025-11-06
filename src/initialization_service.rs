@@ -28,38 +28,7 @@ impl<'a> AppInitializationService<'a> {
     pub async fn initialize(&self) -> Result<InitializedApp, AuthError> {
         tracing::info!("GitHub Notifier starting...");
 
-        let mut auth_manager = AuthManager::new()?;
-
-        // Load token from storage before attempting to get a valid token
-        auth_manager.load_token_from_storage()?;
-
-        // Try to load existing token from keychain and ensure it's valid
-        match auth_manager.get_valid_token_with_reauth().await {
-            Ok(_) => {
-                tracing::info!("Token is valid and ready for use");
-                self.message_handler.print(
-                    "Token is valid and ready for use. The application is now running in the background."
-                );
-                self.message_handler
-                    .print("It will continuously check GitHub for new notifications.");
-                self.message_handler
-                    .print("Press Ctrl+C to stop the application.");
-            }
-            Err(e) => {
-                tracing::error!("Failed to get valid token: {}", e);
-                self.message_handler.eprint(
-                    "Failed to validate authentication token. This may be due to an invalid Personal Access Token."
-                );
-                self.message_handler
-                    .eprint("The stored token may be invalid or have insufficient permissions.");
-                self.message_handler.eprint(
-                    "Please make sure your Personal Access Token has the 'notifications' scope.",
-                );
-                self.exit_handler.exit(1);
-            }
-        }
-
-        // Load config
+        // Load config first to get PAT
         let config = self.config_provider.load_config().unwrap_or_else(|e| {
             self.message_handler
                 .eprint(&format!("Failed to load config: {}", e));
@@ -67,6 +36,71 @@ impl<'a> AppInitializationService<'a> {
             // This line won't be reached due to exit, but Rust requires it
             Config::default()
         });
+
+        let mut auth_manager = AuthManager::new()?;
+
+        // Set the PAT from config if available
+        if let Some(pat) = &config.pat {
+            if !pat.trim().is_empty() {
+                use secrecy::SecretString;
+                let token_info = crate::TokenInfo {
+                    access_token: SecretString::new(pat.trim().to_string()),
+                    token_type: "Bearer".to_string(),
+                    expires_at: None,    // PATs don't expire by default
+                    refresh_token: None, // No refresh token for PAT
+                    refresh_token_expires_at: None,
+                };
+                auth_manager.token_info = Some(token_info);
+            } else {
+                tracing::error!("PAT is set in config but is empty");
+                self.message_handler
+                    .eprint("PAT is set in config but is empty.");
+                self.exit_handler.exit(1);
+            }
+        } else {
+            tracing::error!("No PAT found in config file");
+            self.message_handler.eprint(
+                "No PAT found in config file. Please add 'pat = \"your_token_here\"' to your config file."
+            );
+            self.message_handler.eprint(
+                "Create a PAT at: https://github.com/settings/tokens with 'notifications' scope",
+            );
+            self.exit_handler.exit(1);
+        }
+
+        // Validate the PAT token
+        match auth_manager.validate_token().await {
+            Ok(true) => {
+                tracing::info!("PAT is valid and ready for use");
+                self.message_handler.print(
+                    "PAT is valid and ready for use. The application is now running in the background."
+                );
+                self.message_handler
+                    .print("It will continuously check GitHub for new notifications.");
+                self.message_handler
+                    .print("Press Ctrl+C to stop the application.");
+            }
+            Ok(false) => {
+                tracing::error!(
+                    "PAT validation failed - token is invalid or has insufficient permissions"
+                );
+                self.message_handler.eprint(
+                    "PAT validation failed. This may be due to an invalid Personal Access Token.",
+                );
+                self.message_handler
+                    .eprint("The PAT may be invalid or have insufficient permissions.");
+                self.message_handler.eprint(
+                    "Please make sure your Personal Access Token has the 'notifications' scope.",
+                );
+                self.exit_handler.exit(1);
+            }
+            Err(e) => {
+                tracing::error!("PAT validation request failed: {}", e);
+                self.message_handler
+                    .eprint(&format!("PAT validation request failed: {}", e));
+                self.exit_handler.exit(1);
+            }
+        }
 
         // Initialize clients and services
         let github_client = GitHubClient::new(auth_manager).unwrap();

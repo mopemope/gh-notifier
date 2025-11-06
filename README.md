@@ -50,22 +50,16 @@ cargo build --release
 
 ## 使用方法
 
+## 使用方法
+
 ### 初期設定と認証
 
-初回実行時に、GitHub Personal Access Token を入力するプロンプトが表示されます：
+1. 設定ファイル `~/.config/gh-notifier/config.toml` を作成するか編集します
+2. GitHubのPersonal Access Tokenを設定ファイルの `pat` フィールドに追加します：
 
-1. ターミナル上で `./target/release/gh-notifier` を実行
-2. アプリケーションが以下のように表示します：
-   ```
-   GitHub Notifier starting...
-   No stored Personal Access Token found. Starting authentication process...
-   GitHub Personal Access Token Authentication
-   Please enter your GitHub Personal Access Token.
-   If you don't have one, create it at: https://github.com/settings/tokens
-   Make sure to grant the 'notifications' scope for this application.
-   ```
-3. GitHub Personal Access Token を入力します（画面には表示されません）
-4. アプリケーションがトークンを検証し、OSのキーチェーンに安全に保存します
+```toml
+pat = "your_personal_access_token_here"
+```
 
 ### Personal Access Token の作成方法
 
@@ -74,7 +68,7 @@ cargo build --release
 3. 以下の権限を付与:
    - `notifications` - 通知の読み取り
    - `repo` (オプション) - 通知を既読にする場合
-4. 生成されたトークンをコピーし、アプリケーションのプロンプトに入力
+4. 生成されたトークンをコピーし、設定ファイルの `pat` フィールドに設定
 
 ### 実行
 
@@ -104,7 +98,8 @@ pkill -TERM gh-notifier
 
 デフォルト設定：
 ```toml
-poll_interval_sec = 30                    # 通知ポーリング間隔（秒）
+pat = "your_personal_access_token_here"  # GitHub Personal Access Token
+poll_interval_sec = 30                   # 通知ポーリング間隔（秒）
 mark_as_read_on_notify = false           # 通知表示時に既読にするか
 log_level = "info"                       # ログレベル（info, debug, warn, error）
 log_file_path = ""                       # ログファイルの保存パス（省略可能）

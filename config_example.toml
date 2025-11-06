@@ -6,8 +6,10 @@
 poll_interval_sec = 30
 mark_as_read_on_notify = false
 
-# GitHub OAuth Client ID (default is provided, only change if needed)
-client_id = "Iv1.898a6d2a86c3f7aa"
+# GitHub Personal Access Token (Classic PAT)
+# To create a PAT: https://github.com/settings/tokens
+# The PAT should have at least the 'notifications' scope
+# pat = "your_personal_access_token_here"
 
 # Logging configuration
 log_level = "info"

@@ -2,14 +2,23 @@ use crate::{AuthError, TokenInfo, token_storage::TokenStorage};
 
 pub struct AuthManager {
     pub token_info: Option<TokenInfo>,
-    pub(in crate::auth) token_storage: TokenStorage,
+    pub(in crate::auth) token_storage: Option<TokenStorage>,
 }
 
 impl AuthManager {
     /// Creates a new AuthManager instance for normal usage
     pub fn new() -> Result<Self, AuthError> {
-        // Create the token storage with fallback mechanisms
-        let token_storage = TokenStorage::new()?;
+        // Create the token storage with fallback mechanisms (but make it optional)
+        let token_storage = match TokenStorage::new() {
+            Ok(storage) => Some(storage),
+            Err(e) => {
+                tracing::warn!(
+                    "Token storage initialization failed: {:?}. This is acceptable when using PAT from config.",
+                    e
+                );
+                None
+            }
+        };
 
         Ok(AuthManager {
             token_info: None,
@@ -31,7 +40,7 @@ impl AuthManager {
 
         Ok(AuthManager {
             token_info: None,
-            token_storage,
+            token_storage: Some(token_storage),
         })
     }
 }

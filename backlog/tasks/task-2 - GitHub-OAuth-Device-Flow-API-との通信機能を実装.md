@@ -1,6 +1,6 @@
 ---
 id: task-2
-title: GitHub OAuth Device Flow API との通信機能を実装
+title: GitHub PAT検証APIとの通信機能を実装
 status: Done
 assignee: []
 created_date: '2025-10-31 11:23'
@@ -16,11 +16,11 @@ priority: high
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-GitHub の OAuth Device Flow エンドポイントと通信する機能を実装する。
+GitHub の REST API と通信してPATの有効性を検証する機能を実装する。
 
 主な機能:
-- Device Code と User Code を取得するためのリクエスト
-- Verification URI と User Code をユーザーに表示
-- トークン取得のためのポーリング処理
-- エラーハンドリング（認証タイムアウト、ユーザーによるキャンセルなど）
+- PAT が有効かどうかを検証するためのリクエスト
+- GitHub API への認証付きリクエスト送信
+- トークンの有効性確認処理
+- エラーハンドリング（無効なトークン、権限不足、ネットワークエラーなど）
 <!-- SECTION:DESCRIPTION:END -->

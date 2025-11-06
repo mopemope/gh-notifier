@@ -5,12 +5,12 @@ type: other
 created_date: '2025-10-31 11:17'
 updated_date: '2025-10-31 11:18'
 ---
-# GitHub通知リアルタイムデスクトップ通知デーモン仕様書（OAuth Device Flow版）
+# GitHub通知リアルタイムデスクトップ通知デーモン仕様書（PAT Config版）
 
 ## 1. 概要
 
 本ドキュメントは、GitHub の通知をリアルタイム（または準リアルタイム）で受信し、デスクトップ通知としてユーザーに表示するための軽量なデーモンプログラムの仕様を定義します。  
-認証方式として **GitHub OAuth Device Flow** を採用し、ユーザーが Personal Access Token (PAT) を手動で生成・入力する必要をなくします。  
+認証方式として **設定ファイルに記載されたGitHub Personal Access Token (PAT)** を使用し、安全な認証を実現します。  
 開発言語は **Rust** を使用し、最新の非同期アーキテクチャとモダンなライブラリ群を活用します。
 
 ---
@@ -19,9 +19,9 @@ updated_date: '2025-10-31 11:18'
 
 - GitHub の通知（Issues, Pull Requests, Mentions など）をリアルタイムに受信
 - ユーザーのデスクトップ環境（Linux/macOS/Windows）にネイティブ通知を表示
-- **PAT の手動入力を不要とし、安全でユーザーフレンドリーな OAuth 認証を実現**
+- **PAT の設定ファイル読み込みによるシンプルかつ安全な認証を実現**
 - 軽量・低リソース消費・長時間のバックグラウンド実行を可能にする
-- 認証情報（アクセストークン）を OS キーチェーンに安全に保存
+- 認証情報（アクセストークン）を OS キーチェーンに安全に保存（オプション）
 
 ---
 
@@ -55,42 +55,34 @@ updated_date: '2025-10-31 11:18'
   - 本文：通知の概要
   - クリックでブラウザで通知詳細ページを開く
 
-### 4.3 認証：OAuth Device Flow
+### 4.3 認証：PAT 設定ファイル
 
-#### 初回起動時 or トークン無効時：
-1. アプリが GitHub OAuth Device Flow を開始
-2. ユーザーに以下の情報を表示：
-   - **User Code**（例: `ABCD-EFGH`）
-   - **Verification URI**（例: `https://github.com/login/device`）
-3. ユーザーがブラウザで URI にアクセスし、コードを入力 → GitHub アカウントでログイン・許可
-4. アプリがバックグラウンドでポーリングし、**アクセストークン**と**リフレッシュトークン**を取得
+#### 起動時：
+1. アプリが設定ファイル `~/.config/gh-notifier/config.toml` を読み込み
+2. 設定ファイル内の `pat` フィールドから GitHub Personal Access Token を取得
+3. トークンの有効性を検証
 
 #### 認証スコープ（Scope）
 - 必須スコープ：`notifications`（通知の読み取り）
 - オプション：`repo`（既読マークを付ける場合）
 
 #### トークンの保存
-- アクセストークンとリフレッシュトークンを **OS キーチェーン**に保存
-  - macOS: Keychain
-  - Windows: Credential Vault
-  - Linux: libsecret（GNOME Keyring など）
-- Rust では [`keyring`](https://crates.io/crates/keyring) クレートを使用
+- トークンは設定ファイルに保存されるため、OS キーチェーンへの保存はオプション
+- Rust では [`keyring`](https://crates.io/crates/keyring) クレートを使用（必要に応じて）
 
 #### トークンの更新
-- アクセストークン有効期限切れ時、リフレッシュトークンで自動更新
-- リフレッシュトークンも無効な場合 → 再認証フローを開始
+- PAT は手動で更新されるため、アプリケーションでの自動更新機能は不要
+- トークンが無効な場合 → エラーメッセージを表示し、設定ファイルの更新を促す
 
 ### 4.4 設定ファイル
 
 - 設定ファイル（TOML）で以下を管理：
+  - `pat`: GitHub Personal Access Token
   - `poll_interval_sec`: ポーリング間隔（秒）
   - `mark_as_read_on_notify`: 通知表示時に自動で「既読」にするか（デフォルト: false）
-  - `client_id`: GitHub OAuth App の Client ID（組み込み or 設定可能）
 - 設定ファイルの保存場所：
-  - Linux/macOS: `~/.config/gh-notify-daemon/config.toml`
-  - Windows: `%APPDATA%\gh-notify-daemon\config.toml`
-
-> **Client ID はアプリに組み込み可能**（公開リポジトリ向けの汎用 OAuth App を提供）
+  - Linux/macOS: `~/.config/gh-notifier/config.toml`
+  - Windows: `%APPDATA%\gh-notifier\config.toml`
 
 ### 4.5 ログ出力
 
@@ -127,9 +119,9 @@ updated_date: '2025-10-31 11:18'
 +----------+----------+
 |
 +----------v----------+ +------------------+
-| Auth Manager |<--->| GitHub OAuth API |
-| (Device Flow + | | (Device/Token) |
-| Token Refresh) | +------------------+
+| Auth Manager |<--->| GitHub REST API |
+| (PAT Auth + | | (Token Validation) |
+| Token Management) | +------------------+
 +----------+----------+
 |
 +----------v----------+ +------------------+
@@ -146,7 +138,7 @@ updated_date: '2025-10-31 11:18'
 | コンポーネント | 説明 |
 |----------------|------|
 | `ConfigLoader` | 設定ファイル読み込み |
-| `AuthManager` | OAuth Device Flow 実行、トークン保存・更新、キーチェーン操作 |
+| `AuthManager` | PAT 読み込み、トークン検証・管理、キーチェーン操作（オプション） |
 | `GitHubClient` | 認証済み HTTP クライアント（アクセストークン自動付与） |
 | `Poller` | 通知ポーリング + 新規通知検出 |
 | `Notifier` | OS 依存の通知送信 |
@@ -161,22 +153,9 @@ updated_date: '2025-10-31 11:18'
 | `reqwest` | HTTP クライアント |
 | `serde` + `serde_json` | JSON 処理 |
 | `tracing` + `tracing-subscriber` | ログ |
-| `keyring` | OS キーチェーン統合 |
+| `keyring` | OS キーチェーン統合（オプション） |
 | `clap` | CLI（例: `--reauth`） |
 | `notify-rust` / `winrt-notification` | 通知 |
-| `url` / `base64` | OAuth フロー補助 |
-
----
-
-## 7. OAuth アプリ設定
-
-- 公式 GitHub OAuth App（開発者登録不要）を提供：
-  - **Client ID**: `Iv1.xxxxxxxxxxxxxxxx`（例）
-  - **Device Flow 有効**
-  - **Callback URL**: 不要（Device Flow は不要）
-  - **Scopes**: `notifications`（最小限）
-
-> ユーザーはアプリをビルドする際に Client ID を変更可能（カスタム OAuth App 対応）
 
 ---
 

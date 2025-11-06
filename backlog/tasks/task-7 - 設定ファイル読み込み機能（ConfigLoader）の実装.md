@@ -16,8 +16,8 @@ priority: medium
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
 `config.rs` を作成し、設定ファイル `~/.config/gh-notifier/config.toml` を読み込む機能を実装する。
+- pat (省略可、GitHub Personal Access Token)
 - poll_interval_sec (デフォルト: 30)
 - mark_as_read_on_notify (デフォルト: false)
-- client_id (省略可、デフォルトは組み込み)
 を読み込めるようにする。
 <!-- SECTION:DESCRIPTION:END -->
