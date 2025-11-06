@@ -171,6 +171,15 @@ pub struct Config {
     #[serde(default = "default_persistent_notifications")]
     pub persistent_notifications: bool,
 
+    /// 重要度の高い通知の理由のリスト（例: "review_requested", "mention" など）
+    /// このリストに含まれる理由の通知は、特別な処理（例：永続表示）の対象となる
+    #[serde(default)]
+    pub important_notification_reasons: Vec<String>,
+
+    /// 重要度の高い通知を永続的に表示するかどうか（自動消去しない）
+    #[serde(default = "default_persistent_important_notifications")]
+    pub persistent_important_notifications: bool,
+
     /// APIサーバーを有効にするかどうか
     #[serde(default = "default_api_enabled")]
     pub api_enabled: bool,
@@ -203,6 +212,10 @@ fn default_log_level() -> String {
 
 fn default_persistent_notifications() -> bool {
     true // デフォルトで通知を永続的に表示
+}
+
+fn default_persistent_important_notifications() -> bool {
+    false // デフォルトでは重要度の高い通知も一時的に表示
 }
 
 fn default_api_enabled() -> bool {
@@ -240,6 +253,8 @@ impl Default for Config {
             log_level: default_log_level(),
             log_file_path: None,
             persistent_notifications: default_persistent_notifications(),
+            important_notification_reasons: Vec::new(), // デフォルトは空のリスト
+            persistent_important_notifications: default_persistent_important_notifications(),
             api_enabled: default_api_enabled(),
             api_port: default_api_port(),
             show_read_notifications: default_show_read_notifications(),
