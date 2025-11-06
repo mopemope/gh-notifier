@@ -11,7 +11,7 @@ pub struct HistoryManager {
 
 impl HistoryManager {
     /// 新しいHistoryManagerインスタンスを作成
-    pub fn new(db_path: &Path) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn new(db_path: &Path) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         let storage = NotificationStorage::new(db_path)?;
         Ok(HistoryManager {
             storage: Arc::new(Mutex::new(storage)),
@@ -22,7 +22,7 @@ impl HistoryManager {
     pub fn save_notification(
         &self,
         notification: &Notification,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let storage = self.storage.lock().unwrap();
 
         // 重複チェック
@@ -60,7 +60,7 @@ impl HistoryManager {
     /// すべての通知履歴を取得
     pub fn get_all_notifications(
         &self,
-    ) -> Result<Vec<PersistedNotification>, Box<dyn std::error::Error>> {
+    ) -> Result<Vec<PersistedNotification>, Box<dyn std::error::Error + Send + Sync>> {
         let storage = self.storage.lock().unwrap();
         Ok(storage.get_all_notifications()?)
     }
@@ -68,7 +68,7 @@ impl HistoryManager {
     /// 未読通知のみを取得
     pub fn get_unread_notifications(
         &self,
-    ) -> Result<Vec<PersistedNotification>, Box<dyn std::error::Error>> {
+    ) -> Result<Vec<PersistedNotification>, Box<dyn std::error::Error + Send + Sync>> {
         let storage = self.storage.lock().unwrap();
         Ok(storage.get_unread_notifications()?)
     }
@@ -77,7 +77,7 @@ impl HistoryManager {
     pub fn get_notifications_by_repository(
         &self,
         repository: &str,
-    ) -> Result<Vec<PersistedNotification>, Box<dyn std::error::Error>> {
+    ) -> Result<Vec<PersistedNotification>, Box<dyn std::error::Error + Send + Sync>> {
         let storage = self.storage.lock().unwrap();
         // storageモジュールにフィルタリング機能を追加する必要がある
         let all_notifications = storage.get_all_notifications()?;
@@ -92,7 +92,7 @@ impl HistoryManager {
     pub fn get_notifications_by_reason(
         &self,
         reason: &str,
-    ) -> Result<Vec<PersistedNotification>, Box<dyn std::error::Error>> {
+    ) -> Result<Vec<PersistedNotification>, Box<dyn std::error::Error + Send + Sync>> {
         let storage = self.storage.lock().unwrap();
         let all_notifications = storage.get_all_notifications()?;
         let filtered = all_notifications
@@ -106,7 +106,7 @@ impl HistoryManager {
     pub fn get_notifications_by_subject_type(
         &self,
         subject_type: &str,
-    ) -> Result<Vec<PersistedNotification>, Box<dyn std::error::Error>> {
+    ) -> Result<Vec<PersistedNotification>, Box<dyn std::error::Error + Send + Sync>> {
         let storage = self.storage.lock().unwrap();
         let all_notifications = storage.get_all_notifications()?;
         let filtered = all_notifications
@@ -117,14 +117,17 @@ impl HistoryManager {
     }
 
     /// 通知を既読にする
-    pub fn mark_as_read(&self, notification_id: &str) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn mark_as_read(
+        &self,
+        notification_id: &str,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let storage = self.storage.lock().unwrap();
         storage.mark_as_read(notification_id)?;
         Ok(())
     }
 
     /// すべての通知を既読にする
-    pub fn mark_all_as_read(&self) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn mark_all_as_read(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let storage = self.storage.lock().unwrap();
         storage.mark_all_as_read()?;
         Ok(())
@@ -134,14 +137,14 @@ impl HistoryManager {
     pub fn delete_notification(
         &self,
         notification_id: &str,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let storage = self.storage.lock().unwrap();
         storage.delete_notification(notification_id)?;
         Ok(())
     }
 
     /// 保存された通知の数を取得
-    pub fn get_notification_count(&self) -> Result<u32, Box<dyn std::error::Error>> {
+    pub fn get_notification_count(&self) -> Result<u32, Box<dyn std::error::Error + Send + Sync>> {
         let storage = self.storage.lock().unwrap();
         Ok(storage.get_notification_count()?)
     }
@@ -150,7 +153,7 @@ impl HistoryManager {
     pub fn notification_exists(
         &self,
         notification_id: &str,
-    ) -> Result<bool, Box<dyn std::error::Error>> {
+    ) -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
         let storage = self.storage.lock().unwrap();
         Ok(storage.notification_exists(notification_id)?)
     }
@@ -159,7 +162,7 @@ impl HistoryManager {
     pub fn is_notification_read(
         &self,
         notification_id: &str,
-    ) -> Result<bool, Box<dyn std::error::Error>> {
+    ) -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
         let storage = self.storage.lock().unwrap();
         let notifications = storage.get_all_notifications()?;
         let notification = notifications.iter().find(|n| n.id == notification_id);

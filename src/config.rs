@@ -182,6 +182,10 @@ pub struct Config {
     /// 既読通知を表示するかどうか
     #[serde(default = "default_show_read_notifications")]
     pub show_read_notifications: bool,
+
+    /// システム再起動時に再通知する通知の期間（時間）
+    #[serde(default = "default_notification_recovery_window_hours")]
+    pub notification_recovery_window_hours: u64,
 }
 
 // デフォルト値の定義
@@ -213,6 +217,10 @@ fn default_show_read_notifications() -> bool {
     true
 }
 
+fn default_notification_recovery_window_hours() -> u64 {
+    24 // Default to 24 hours
+}
+
 impl Default for Config {
     fn default() -> Self {
         // デフォルトでは自分宛てのPRレビュー依頼の通知のみを表示
@@ -235,6 +243,7 @@ impl Default for Config {
             api_enabled: default_api_enabled(),
             api_port: default_api_port(),
             show_read_notifications: default_show_read_notifications(),
+            notification_recovery_window_hours: default_notification_recovery_window_hours(),
         }
     }
 }

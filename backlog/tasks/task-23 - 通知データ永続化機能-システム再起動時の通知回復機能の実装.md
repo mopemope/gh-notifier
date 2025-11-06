@@ -1,11 +1,11 @@
 ---
 id: task-23
 title: 通知データ永続化機能 - システム再起動時の通知回復機能の実装
-status: To Do
+status: Done
 assignee:
   - developer
 created_date: '2025-11-06 06:35'
-updated_date: '2025-11-06 06:36'
+updated_date: '2025-11-06 09:41'
 labels:
   - feature
   - recovery

@@ -126,3 +126,6 @@ api_port = 8080
 
 # Notification display configuration
 show_read_notifications = true  # Whether to show read notifications (default: true)
+
+# Notification recovery configuration
+notification_recovery_window_hours = 24  # Hours to look back for recovery notifications (default: 24)

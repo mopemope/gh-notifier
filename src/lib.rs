@@ -2,6 +2,7 @@ pub mod api;
 pub mod app;
 pub mod auth;
 pub mod auth_manager;
+pub mod cli;
 pub mod config;
 pub mod errors;
 pub mod github_client;
