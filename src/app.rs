@@ -1,7 +1,6 @@
 use crate::{
     AppInitializationService, Config, ConfigProvider, DefaultConfigProvider, DefaultExitHandler,
-    DefaultMessageHandler, ExitHandler, MessageHandler, RuntimeController, poller::Notifier,
-    runtime::run_polling_loop_with_shutdown,
+    DefaultMessageHandler, ExitHandler, MessageHandler, runtime::run_polling_loop_with_shutdown,
 };
 
 /// Main application structure
@@ -53,42 +52,6 @@ impl Application {
 
         tracing::info!("GitHub Notifier shutdown complete");
         Ok(())
-    }
-}
-
-// Custom error type to satisfy the Sized requirement
-#[derive(Debug)]
-pub struct RuntimeError {
-    source: Box<dyn std::error::Error + Send + Sync>,
-}
-
-impl std::fmt::Display for RuntimeError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.source)
-    }
-}
-
-impl std::error::Error for RuntimeError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        Some(self.source.as_ref() as &(dyn std::error::Error + 'static))
-    }
-}
-
-impl RuntimeController for Application {
-    type Error = RuntimeError;
-
-    fn run_with_shutdown(
-        &self,
-        config: Config,
-        github_client: crate::GitHubClient,
-        state_manager: crate::StateManager,
-        notifier: Box<dyn Notifier>,
-    ) -> impl std::future::Future<Output = Result<(), Self::Error>> + Send {
-        async move {
-            run_polling_loop_with_shutdown(config, github_client, state_manager, notifier)
-                .await
-                .map_err(|e| RuntimeError { source: e })
-        }
     }
 }
 

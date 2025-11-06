@@ -115,6 +115,29 @@ exclude_private_repos = false              # プライベートリポジトリ�
 exclude_fork_repos = false                 # フォークリポジトリの通知を除外するかどうか
 exclude_participating = false              # 参加しているスレッドの通知を除外するかどうか
 
+## 自分宛てのPRレビューのみを通知する設定方法
+
+自分宛てのプルリクエストレビュー依頼のみを通知するように設定するには、以下の2つの方法があります：
+
+### 方法1: デフォルト設定を使用（推奨）
+アプリケーションはデフォルトで自分宛てのPRレビュー依頼のみを通知するように設定されています。特別な設定をしなくても、`include_reasons = ["review_requested"]` と `include_subject_types = ["PullRequest"]` がデフォルトで適用されるため、特に設定ファイルを変更する必要はありません。
+
+### 方法2: 設定ファイルで明示的に指定
+設定ファイルで明示的に指定する場合、以下のように設定します：
+
+```toml
+[notification_filters]
+# 自分宛てのPRレビュー依頼のみを通知する設定
+include_reasons = ["review_requested"]     # レビュー依頼のみを通知
+include_subject_types = ["PullRequest"]    # プルリクエストのみを対象
+
+# オプションで追加のフィルタを設定可能
+exclude_draft_prs = false                  # ドラフトPRを除外しない（trueにするとドラフトPRは通知されません）
+exclude_private_repos = false              # プライベートリポジトリを除外しない
+```
+
+この設定により、GitHub APIから届くすべての通知の中で、自分にレビューが依頼されたプルリクエストのみがデスクトップ通知として表示されます。
+
 # 通知バッチ処理設定（バッチ処理を無効にするにはbatch_size = 0）
 [notification_batch_config]
 batch_size = 0                           # 通知バッチの最大数（0で無効）
@@ -131,11 +154,35 @@ retry_interval_sec = 5                   # 再試行間隔（秒）
 ## 設定例
 
 ### 自分宛てのPRレビュー依頼のみを通知（デフォルト）
+アプリケーションはデフォルトで自分宛てのPRレビュー依頼のみを通知するように設定されています。この設定は以下のように明示的に設定することもできます：
+
 ```toml
 [notification_filters]
 include_reasons = ["review_requested"]
 include_subject_types = ["PullRequest"]
 ```
+
+この設定により、自分にレビューが依頼されたプルリクエストのみが通知されます。他のすべての通知（メンション、コメント、Issueの更新など）はフィルタリングされます。
+
+### すべてのメンションとPRレビュー依頼を通知
+```toml
+[notification_filters]
+include_reasons = ["mention", "review_requested"]
+include_subject_types = ["Issue", "PullRequest"]
+```
+
+### PRレビュー依頼のみを通知（より明示的な例）
+特定の通知理由とタイプのみを受信する場合、以下の設定が最も明確です：
+
+```toml
+[notification_filters]
+# 自分にレビューが依頼されたプルリクエストのみを通知
+include_reasons = ["review_requested"]     # レビュー依頼のみ
+include_subject_types = ["PullRequest"]    # プルリクエストのみ
+# 他のすべての通知は除外されます
+```
+
+この設定では、GitHubから届くすべての通知がフィルタリングされ、自分にレビューが依頼されたプルリクエストの通知だけがデスクトップ通知として表示されます。
 
 ### すべてのメンションとPRレビュー依頼を通知
 ```toml

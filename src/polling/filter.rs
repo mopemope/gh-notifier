@@ -6,7 +6,7 @@ pub fn filter_new_notifications<'a>(
     state_manager: &StateManager,
     config: &Config,
 ) -> Vec<&'a Notification> {
-    let mut filtered_notifications: Vec<&'a Notification> =
+    let filtered_notifications: Vec<&'a Notification> =
         if let Some(last_checked) = state_manager.get_last_checked_at() {
             notifications
                 .iter()
@@ -18,33 +18,25 @@ pub fn filter_new_notifications<'a>(
         };
 
     // 設定に基づいて通知をフィルタリング
-    filtered_notifications.retain(|n| {
-        // 各フィルタを順に適用
-        crate::polling::filters::repository_filter::filter_by_repository(n, config)
-            && crate::polling::filters::organization_filter::filter_by_organization(n, config)
-            && crate::polling::filters::type_filter::filter_by_subject_type(n, config)
-            && crate::polling::filters::reason_filter::filter_by_reason(n, config)
-            && crate::polling::filters::content_filter::filter_by_content(n, config)
-            && crate::polling::filters::time_filter::filter_by_time(n, config)
-            && crate::polling::filters::draft_filter::filter_by_draft_status(n, config)
-            // リポジトリプロパティのフィルタリング
-            && (!config.notification_filters.exclude_private_repos || !n.repository.private)
-            // NOTE: fork判定はGitHub APIのレスポンスには含まれないため、実装は一旦スキップ
-            // if config.notification_filters.exclude_fork_repos && n.repository.is_fork {  // is_forkは存在しない
-            //     return false;
-            // }
-            // 参加スレッドのフィルタリング
-            // NOTE: GitHub APIの通知レスポンスにはparticipatingフィールドがないため、
-            // 代わりにlast_read_atがNoneかどうかで未読のみを対象とするようなフィルタとして実装
-            // 本来のexclude_participatingはAPIから得られる情報で判定することは難しい
-            && {
-                // For now, we'll just return true since exclude_participating is not fully functional
-                // due to the API limitation mentioned in the code
-                true
-            }
-    });
-
     filtered_notifications
+        .into_iter()
+        .filter(|n| {
+            // Early exit if quick checks fail
+            // リポジトリプロパティのフィルタリング - これらのチェックは軽量なので先に行う
+            if config.notification_filters.exclude_private_repos && n.repository.private {
+                return false;
+            }
+
+            // 各フィルタを順に適用 (短絡評価により、いずれかがfalseなら以降は評価されない)
+            crate::polling::filters::repository_filter::filter_by_repository(n, config)
+                && crate::polling::filters::organization_filter::filter_by_organization(n, config)
+                && crate::polling::filters::type_filter::filter_by_subject_type(n, config)
+                && crate::polling::filters::reason_filter::filter_by_reason(n, config)
+                && crate::polling::filters::content_filter::filter_by_content(n, config)
+                && crate::polling::filters::time_filter::filter_by_time(n, config)
+                && crate::polling::filters::draft_filter::filter_by_draft_status(n, config)
+        })
+        .collect()
 }
 
 #[cfg(test)]

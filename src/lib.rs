@@ -32,5 +32,5 @@ pub use shutdown::wait_for_shutdown_signal;
 pub use state::{State, StateManager};
 pub use traits::{
     ConfigProvider, DefaultConfigProvider, DefaultExitHandler, DefaultMessageHandler, ExitHandler,
-    MessageHandler, RuntimeController,
+    MessageHandler,
 };

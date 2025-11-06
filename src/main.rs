@@ -1,4 +1,4 @@
-use gh_notifier::app::Application;
+use gh_notifier::Application;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {

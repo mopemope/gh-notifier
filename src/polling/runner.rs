@@ -64,7 +64,7 @@ pub async fn run_polling_loop(
                             )
                             .await
                             {
-                                eprintln!("Failed to process batch: {}", e);
+                                tracing::error!("Failed to process batch: {}", e);
                             }
                             batch_buffer.clear();
                             last_batch_time = Instant::now();
@@ -81,14 +81,14 @@ pub async fn run_polling_loop(
                             )
                             .await
                             {
-                                eprintln!("Failed to handle notification: {}", e);
+                                tracing::error!("Failed to handle notification: {}", e);
                             }
                         }
                     }
 
                     // 状態を保存
                     if let Err(e) = state_manager.save() {
-                        eprintln!("Failed to save state: {}", e);
+                        tracing::error!("Failed to save state: {}", e);
                     }
                 }
             }

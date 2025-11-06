@@ -1,5 +1,3 @@
-use crate::poller::Notifier;
-
 /// Trait for handling process exits, allowing for testable exit behavior
 pub trait ExitHandler: Send + Sync {
     fn exit(&self, code: i32);
@@ -54,19 +52,6 @@ pub trait ApplicationInitializer: Send + Sync {
     type Error: std::error::Error + Send + Sync + 'static;
 
     fn initialize(&self) -> Result<crate::InitializedApp, Self::Error>;
-}
-
-/// Trait for the runtime controller
-pub trait RuntimeController: Send + Sync {
-    type Error: std::error::Error + Send + Sync;
-
-    fn run_with_shutdown(
-        &self,
-        config: crate::Config,
-        github_client: crate::GitHubClient,
-        state_manager: crate::StateManager,
-        notifier: Box<dyn Notifier>,
-    ) -> impl std::future::Future<Output = Result<(), Self::Error>> + Send;
 }
 
 #[cfg(test)]
