@@ -8,7 +8,7 @@
 
 ## ビルド・テスト・開発コマンド
 - `cargo build` : デバッグビルド。初回は依存関係のダウンロードを伴います。
-- `cargo run` : バイナリをビルドし、GitHub OAuth デバイスフローの対話を含むデーモンを起動します。
+- `cargo run` : バイナリをビルドし、GitHub Personal Access Token (PAT) を使用してデーモンを起動します。
 - `cargo build --release` : 本番利用向けの最適化バイナリを `target/release/gh-notifier` に生成します。
 - `cargo fmt` : `rustfmt.toml` に従ってソースを整形します。PR 前に実行してください。
 
