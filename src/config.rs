@@ -183,10 +183,12 @@ fn default_log_level() -> String {
 
 impl Default for Config {
     fn default() -> Self {
-        let mut notification_filters = NotificationFilter::default();
         // デフォルトでは自分宛てのPRレビュー依頼の通知のみを表示
-        notification_filters.include_reasons = vec!["review_requested".to_string()];
-        notification_filters.include_subject_types = vec!["PullRequest".to_string()];
+        let notification_filters = NotificationFilter {
+            include_reasons: vec!["review_requested".to_string()],
+            include_subject_types: vec!["PullRequest".to_string()],
+            ..Default::default()
+        };
 
         Config {
             poll_interval_sec: default_poll_interval_sec(),

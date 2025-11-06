@@ -20,19 +20,19 @@ pub async fn handle_notification(
 
     // Create a more informative body with additional context
     let time_ago_text = format_time_ago(&notification.updated_at);
-    let body = format!(
-        "{}\n\n{} | {} | Updated: {}",
-        notification.subject.title,
-        notification.repository.name,
-        format_subject_kind(&notification.subject.kind),
-        time_ago_text
-    );
-
     let url = &notification
         .subject
         .url
         .as_ref()
         .unwrap_or(&notification.url);
+    let body = format!(
+        "{}\n\n{} | {} | Updated: {}\nURL: {}",
+        notification.subject.title,
+        notification.repository.name,
+        format_subject_kind(&notification.subject.kind),
+        time_ago_text,
+        url
+    );
 
     notifier.send_notification(&title, &body, url)?;
 
