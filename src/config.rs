@@ -186,7 +186,7 @@ fn default_log_level() -> String {
 }
 
 fn default_persistent_notifications() -> bool {
-    false  // デフォルトでは現在の挙動（自動消去）を維持
+    false // デフォルトでは現在の挙動（自動消去）を維持
 }
 
 impl Default for Config {

@@ -30,6 +30,7 @@ pub struct InitializedApp {
     pub github_client: GitHubClient,
     pub state_manager: StateManager,
     pub notifier: Box<dyn Notifier>,
+    pub history_manager: crate::HistoryManager,
 }
 
 #[cfg(test)]

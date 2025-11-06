@@ -8,6 +8,8 @@ pub enum AuthError {
     JsonError(serde_json::Error),
     /// Error with keyring operations
     KeyringError(keyring::Error),
+    /// Error with initialization
+    InitializationError(String),
     /// General authentication error
     GeneralError(String),
 }
@@ -18,6 +20,7 @@ impl std::fmt::Display for AuthError {
             AuthError::RequestError(e) => write!(f, "Request error: {}", e),
             AuthError::JsonError(e) => write!(f, "JSON error: {}", e),
             AuthError::KeyringError(e) => write!(f, "Keyring error: {}", e),
+            AuthError::InitializationError(msg) => write!(f, "Initialization error: {}", msg),
             AuthError::GeneralError(msg) => write!(f, "Authentication error: {}", msg),
         }
     }

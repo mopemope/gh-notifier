@@ -1,25 +1,31 @@
-use crate::{Config, GitHubClient, Poller, StateManager, poller::Notifier};
+use crate::{Config, GitHubClient, HistoryManager, StateManager, poller::Notifier};
 use tokio::sync::broadcast;
 
 /// Execute the main polling loop with shutdown capability
 pub async fn run_polling_loop_with_shutdown(
     config: Config,
-    github_client: GitHubClient,
-    state_manager: StateManager,
+    mut github_client: GitHubClient,
+    mut state_manager: StateManager,
     notifier: Box<dyn Notifier>,
+    history_manager: HistoryManager,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // Create shutdown channel
     let (shutdown_tx, _) = broadcast::channel(1);
     let shutdown_tx_for_poller = shutdown_tx.clone(); // Clone for the poller task
 
-    // Create poller with initialized components
-    let mut poller = Poller::new(config, github_client, state_manager, notifier);
-
     // Spawn the polling loop as a separate async task
     let poller_task = tokio::spawn(async move {
         // Create a shutdown receiver for the spawned task
-        let poller_shutdown_rx = shutdown_tx_for_poller.subscribe();
-        poller.run_with_shutdown(poller_shutdown_rx).await
+        let mut shutdown_rx = shutdown_tx_for_poller.subscribe();
+        crate::polling::run_polling_loop_with_shutdown(
+            &config,
+            &mut github_client,
+            &mut state_manager,
+            notifier.as_ref(),
+            &mut shutdown_rx,
+            &history_manager,
+        )
+        .await
     });
 
     // Wait for shutdown signal
@@ -45,4 +51,22 @@ pub async fn run_polling_loop_with_shutdown(
     }
 
     Ok(())
+}
+
+/// Execute the main polling loop without shutdown capability
+pub async fn run_polling_loop(
+    config: Config,
+    mut github_client: GitHubClient,
+    mut state_manager: StateManager,
+    notifier: Box<dyn Notifier>,
+    history_manager: HistoryManager,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    crate::polling::run_polling_loop(
+        &config,
+        &mut github_client,
+        &mut state_manager,
+        notifier.as_ref(),
+        &history_manager,
+    )
+    .await
 }

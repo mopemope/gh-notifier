@@ -1,5 +1,5 @@
 use crate::poller::Notifier;
-use crate::{Config, GitHubClient, Notification};
+use crate::{Config, GitHubClient, HistoryManager, Notification};
 use chrono::{DateTime, Local, Utc};
 
 /// 通知を Notifier に渡して表示し、必要に応じて既読にする
@@ -8,6 +8,7 @@ pub async fn handle_notification(
     notifier: &dyn Notifier,
     github_client: &mut GitHubClient,
     config: &Config,
+    history_manager: &HistoryManager,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // Create a more specific title with reason information
     let reason_text = get_reason_display_text(&notification.reason);
@@ -35,6 +36,11 @@ pub async fn handle_notification(
     );
 
     notifier.send_notification(&title, &body, url, config)?;
+
+    // 通知を履歴に保存（重複チェック付き）
+    if let Err(e) = history_manager.save_notification(notification) {
+        tracing::error!("Failed to save notification to history: {}", e);
+    }
 
     if config.mark_as_read_on_notify {
         github_client
@@ -127,6 +133,7 @@ mod tests {
     #[tokio::test]
     #[ignore] // 認証トークンがないとテストできないため
     async fn test_handle_notification() {
+        use tempfile::tempdir;
         let config = Config::default();
         let auth_manager = AuthManager::new().unwrap();
         let mut github_client = GitHubClient::new(auth_manager).unwrap();
@@ -154,7 +161,19 @@ mod tests {
         };
         let notifier: &dyn crate::poller::Notifier = &DummyNotifier;
 
-        let result = handle_notification(&notification, notifier, &mut github_client, &config).await;
+        // テスト用に一時的なデータベースを作成
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("test.db");
+        let history_manager = crate::HistoryManager::new(&db_path).unwrap();
+
+        let result = handle_notification(
+            &notification,
+            notifier,
+            &mut github_client,
+            &config,
+            &history_manager,
+        )
+        .await;
         assert!(result.is_ok());
     }
 }

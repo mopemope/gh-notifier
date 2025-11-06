@@ -16,6 +16,7 @@ pub struct Poller {
     github_client: GitHubClient,
     state_manager: StateManager,
     notifier: Box<dyn Notifier>,
+    history_manager: crate::HistoryManager,
 }
 
 impl Poller {
@@ -24,12 +25,14 @@ impl Poller {
         github_client: GitHubClient,
         state_manager: StateManager,
         notifier: Box<dyn Notifier>,
+        history_manager: crate::HistoryManager,
     ) -> Self {
         Poller {
             config,
             github_client,
             state_manager,
             notifier,
+            history_manager,
         }
     }
 
@@ -40,6 +43,7 @@ impl Poller {
             &mut self.github_client,
             &mut self.state_manager,
             self.notifier.as_ref(),
+            &self.history_manager,
         )
         .await
     }
@@ -55,6 +59,7 @@ impl Poller {
             &mut self.state_manager,
             self.notifier.as_ref(),
             &mut shutdown_rx,
+            &self.history_manager,
         )
         .await
     }
@@ -71,7 +76,10 @@ impl Notifier for DesktopNotifier {
         config: &Config,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let mut notification = Notification::new();
-        notification.summary(title).body(body).icon("dialog-information");
+        notification
+            .summary(title)
+            .body(body)
+            .icon("dialog-information");
 
         // persistent_notifications設定に基づいて通知の永続性を制御
         if config.persistent_notifications {
@@ -85,7 +93,8 @@ impl Notifier for DesktopNotifier {
             url.to_string(),
         ));
 
-        notification.show()
+        notification
+            .show()
             .map_err(|e| Box::new(std::io::Error::other(e)))?;
         Ok(())
     }
@@ -138,7 +147,8 @@ impl Notifier for WindowsNotifier {
             toast = toast.duration(winrt_notification::Duration::Default);
         }
 
-        toast.show()
+        toast
+            .show()
             .map_err(|e| Box::new(std::io::Error::other(e)))?;
 
         Ok(())
@@ -156,8 +166,15 @@ impl Notifier for DummyNotifier {
         url: &str,
         config: &Config,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        let persistence_status = if config.persistent_notifications { "persistent" } else { "transient" };
-        println!("Notification: {} - {} (URL: {}, Status: {})", title, body, url, persistence_status);
+        let persistence_status = if config.persistent_notifications {
+            "persistent"
+        } else {
+            "transient"
+        };
+        println!(
+            "Notification: {} - {} (URL: {}, Status: {})",
+            title, body, url, persistence_status
+        );
         Ok(())
     }
 }
@@ -166,6 +183,7 @@ impl Notifier for DummyNotifier {
 mod tests {
     use super::*;
     use crate::{AuthManager, Notification, NotificationRepository, NotificationSubject};
+    use tempfile::tempdir;
 
     struct DummyNotifier;
 
@@ -185,12 +203,25 @@ mod tests {
     #[tokio::test]
     #[ignore] // 認証トークンがないとテストできないため
     async fn test_poller_creation() {
+        use tempfile::tempdir;
         let config = Config::default();
         let auth_manager = AuthManager::new().unwrap();
         let github_client = GitHubClient::new(auth_manager).unwrap();
         let state_manager = StateManager::new().unwrap();
         let notifier: Box<dyn Notifier> = Box::new(DummyNotifier);
-        let poller = Poller::new(config, github_client, state_manager, notifier);
+
+        // テスト用に一時的なデータベースを作成
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("test.db");
+        let history_manager = crate::HistoryManager::new(&db_path).unwrap();
+
+        let poller = Poller::new(
+            config,
+            github_client,
+            state_manager,
+            notifier,
+            history_manager,
+        );
         // 構造体が作成できることを確認
         assert_eq!(poller.config.poll_interval_sec, 30);
     }
@@ -205,7 +236,18 @@ mod tests {
         let github_client = GitHubClient::new(auth_manager).unwrap();
         let state_manager = StateManager::new().unwrap();
         let notifier: Box<dyn Notifier> = Box::new(DummyNotifier);
-        let _poller = Poller::new(config.clone(), github_client, state_manager, notifier);
+        // テスト用に一時的なデータベースを作成
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("test.db");
+        let history_manager = crate::HistoryManager::new(&db_path).unwrap();
+
+        let _poller = Poller::new(
+            config.clone(),
+            github_client,
+            state_manager,
+            notifier,
+            history_manager,
+        );
 
         let old_time = "2023-01-01T00:00:00Z";
         let new_time = "2023-01-02T00:00:00Z";
@@ -278,7 +320,8 @@ mod tests {
         let notifier = DesktopNotifier;
         let config = crate::Config::default();
         // テストでは通知を表示しないが、エラーが発生しないことを確認
-        let result = notifier.send_notification("Test Title", "Test Body", "https://example.com", &config);
+        let result =
+            notifier.send_notification("Test Title", "Test Body", "https://example.com", &config);
         assert!(result.is_ok());
     }
 
@@ -288,7 +331,8 @@ mod tests {
         let notifier = WindowsNotifier;
         let config = crate::Config::default();
         // テストでは通知を表示しないが、エラーが発生しないことを確認
-        let result = notifier.send_notification("Test Title", "Test Body", "https://example.com", &config);
+        let result =
+            notifier.send_notification("Test Title", "Test Body", "https://example.com", &config);
         assert!(result.is_ok());
     }
 }

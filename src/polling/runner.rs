@@ -1,5 +1,5 @@
 use crate::poller::Notifier;
-use crate::{Config, GitHubClient, Notification, StateManager};
+use crate::{Config, GitHubClient, HistoryManager, Notification, StateManager};
 use std::collections::VecDeque;
 use std::time::Duration as StdDuration;
 use tokio::sync::broadcast;
@@ -10,6 +10,7 @@ pub async fn run_polling_loop(
     github_client: &mut GitHubClient,
     state_manager: &mut StateManager,
     notifier: &dyn Notifier,
+    history_manager: &HistoryManager,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let mut interval = interval(StdDuration::from_secs(config.poll_interval_sec));
     // バッチ処理用のバッファとタイマー
@@ -61,6 +62,7 @@ pub async fn run_polling_loop(
                                 github_client,
                                 config,
                                 error_handling,
+                                history_manager,
                             )
                             .await
                             {
@@ -78,6 +80,7 @@ pub async fn run_polling_loop(
                                 notifier,
                                 github_client,
                                 config,
+                                history_manager,
                             )
                             .await
                             {
@@ -110,6 +113,7 @@ pub async fn run_polling_loop_with_shutdown(
     state_manager: &mut StateManager,
     notifier: &dyn Notifier,
     shutdown_rx: &mut broadcast::Receiver<()>,
+    history_manager: &HistoryManager,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let mut interval = interval(StdDuration::from_secs(config.poll_interval_sec));
     // バッチ処理用のバッファとタイマー
@@ -162,6 +166,7 @@ pub async fn run_polling_loop_with_shutdown(
                                         github_client,
                                         config,
                                         error_handling,
+                                        history_manager,
                                     )
                                     .await
                                     {
@@ -179,6 +184,7 @@ pub async fn run_polling_loop_with_shutdown(
                                         notifier,
                                         github_client,
                                         config,
+                                        history_manager,
                                     )
                                     .await
                                     {
@@ -222,6 +228,7 @@ async fn process_batch(
     github_client: &mut GitHubClient,
     config: &Config,
     _error_handling: &crate::config::PollingErrorHandlingConfig,
+    history_manager: &HistoryManager,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     for notification in batch {
         // 通知を Notifier に渡す
@@ -230,6 +237,7 @@ async fn process_batch(
             notifier,
             github_client,
             config,
+            history_manager,
         )
         .await
         {
@@ -261,6 +269,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_run_polling_loop_with_shutdown_immediate() {
+        use tempfile::tempdir;
         let config = Config::default();
         let auth_manager = AuthManager::new().unwrap();
         let mut github_client = GitHubClient::new(auth_manager).unwrap();
@@ -270,6 +279,11 @@ mod tests {
         // Create a shutdown sender and immediately send a shutdown signal
         let (shutdown_tx, _) = broadcast::channel(1);
         let mut shutdown_rx = shutdown_tx.subscribe();
+
+        // テスト用に一時的なデータベースを作成
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("test.db");
+        let history_manager = crate::HistoryManager::new(&db_path).unwrap();
 
         // Send shutdown signal
         let _ = shutdown_tx.send(());
@@ -281,6 +295,7 @@ mod tests {
             &mut state_manager,
             &notifier,
             &mut shutdown_rx,
+            &history_manager,
         )
         .await;
 
@@ -290,6 +305,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_run_polling_loop_with_shutdown_after_creation() {
+        use tempfile::tempdir;
         let config = Config::default();
         let auth_manager = AuthManager::new().unwrap();
         let mut github_client = GitHubClient::new(auth_manager).unwrap();
@@ -303,6 +319,11 @@ mod tests {
         // Create a second sender to send shutdown signal later
         let shutdown_tx2 = shutdown_tx.clone();
 
+        // テスト用に一時的なデータベースを作成
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("test.db");
+        let history_manager = crate::HistoryManager::new(&db_path).unwrap();
+
         // Spawn the function and then send shutdown
         let handle = tokio::spawn(async move {
             run_polling_loop_with_shutdown(
@@ -311,6 +332,7 @@ mod tests {
                 &mut state_manager,
                 &notifier,
                 &mut shutdown_rx,
+                &history_manager,
             )
             .await
         });

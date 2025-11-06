@@ -1,6 +1,6 @@
 use crate::{
-    AuthError, Config, ConfigProvider, DesktopNotifier, ExitHandler, GitHubClient, InitializedApp,
-    MessageHandler, StateManager, auth_manager::AuthManager,
+    AuthError, Config, ConfigProvider, DesktopNotifier, ExitHandler, GitHubClient, HistoryManager,
+    InitializedApp, MessageHandler, StateManager, auth_manager::AuthManager,
 };
 
 /// Service that handles application initialization with dependency injection
@@ -107,6 +107,35 @@ impl<'a> AppInitializationService<'a> {
         let state_manager = StateManager::new().unwrap();
         let notifier = Box::new(DesktopNotifier);
 
+        // Initialize history manager
+        let history_manager = {
+            use dirs;
+
+            // Create data directory path
+            let mut data_dir = dirs::data_dir().unwrap_or_else(|| {
+                std::env::current_dir().expect("Current directory not accessible")
+            });
+            data_dir.push("gh-notifier");
+
+            // Create directory if it doesn't exist
+            std::fs::create_dir_all(&data_dir).map_err(|e| {
+                crate::errors::AuthError::InitializationError(format!(
+                    "Failed to create data directory: {}",
+                    e
+                ))
+            })?;
+
+            // Create database file path
+            let db_path = data_dir.join("notifications.db");
+
+            HistoryManager::new(&db_path).map_err(|e| {
+                crate::errors::AuthError::InitializationError(format!(
+                    "Failed to initialize HistoryManager: {}",
+                    e
+                ))
+            })?
+        };
+
         tracing::info!("GitHub Notifier running with authenticated access");
 
         Ok(InitializedApp {
@@ -114,6 +143,7 @@ impl<'a> AppInitializationService<'a> {
             github_client,
             state_manager,
             notifier,
+            history_manager,
         })
     }
 }

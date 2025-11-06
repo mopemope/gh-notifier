@@ -1,11 +1,11 @@
 ---
 id: task-20
 title: 通知データ永続化機能 - 通知履歴管理システムの実装
-status: To Do
+status: Done
 assignee:
   - developer
 created_date: '2025-11-06 06:35'
-updated_date: '2025-11-06 06:36'
+updated_date: '2025-11-06 07:15'
 labels:
   - feature
   - history

@@ -47,6 +47,7 @@ impl Application {
             initialized_app.github_client,
             initialized_app.state_manager,
             initialized_app.notifier,
+            initialized_app.history_manager,
         )
         .await?;
 
