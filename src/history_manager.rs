@@ -4,6 +4,7 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 /// 通知履歴を管理するためのマネージャー
+#[derive(Clone)]
 pub struct HistoryManager {
     storage: Arc<Mutex<NotificationStorage>>,
 }
@@ -153,6 +154,17 @@ impl HistoryManager {
         let storage = self.storage.lock().unwrap();
         Ok(storage.notification_exists(notification_id)?)
     }
+
+    /// 通知が既読かどうか確認
+    pub fn is_notification_read(
+        &self,
+        notification_id: &str,
+    ) -> Result<bool, Box<dyn std::error::Error>> {
+        let storage = self.storage.lock().unwrap();
+        let notifications = storage.get_all_notifications()?;
+        let notification = notifications.iter().find(|n| n.id == notification_id);
+        Ok(notification.map(|n| n.is_read).unwrap_or(false))
+    }
 }
 
 #[cfg(test)]
@@ -203,7 +215,7 @@ mod tests {
         assert_eq!(saved_notifications[0].repository, "test/repo");
         assert_eq!(saved_notifications[0].reason, "review_requested");
         assert_eq!(saved_notifications[0].subject_type, "PullRequest");
-        assert_eq!(saved_notifications[0].is_read, false);
+        assert!(!saved_notifications[0].is_read);
 
         // 重複通知の保存を試みる（保存されないことを確認）
         history_manager.save_notification(&notification).unwrap();
@@ -215,7 +227,7 @@ mod tests {
             .mark_as_read("test-notification-id")
             .unwrap();
         let updated_notifications = history_manager.get_all_notifications().unwrap();
-        assert_eq!(updated_notifications[0].is_read, true);
+        assert!(updated_notifications[0].is_read);
 
         // 未読通知の取得
         let unread_notifications = history_manager.get_unread_notifications().unwrap();

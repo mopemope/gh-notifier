@@ -170,6 +170,18 @@ pub struct Config {
     /// 通知を永続的に表示するかどうか（自動消去しない）
     #[serde(default = "default_persistent_notifications")]
     pub persistent_notifications: bool,
+
+    /// APIサーバーを有効にするかどうか
+    #[serde(default = "default_api_enabled")]
+    pub api_enabled: bool,
+
+    /// APIサーバーのポート番号
+    #[serde(default = "default_api_port")]
+    pub api_port: u16,
+
+    /// 既読通知を表示するかどうか
+    #[serde(default = "default_show_read_notifications")]
+    pub show_read_notifications: bool,
 }
 
 // デフォルト値の定義
@@ -187,6 +199,18 @@ fn default_log_level() -> String {
 
 fn default_persistent_notifications() -> bool {
     false // デフォルトでは現在の挙動（自動消去）を維持
+}
+
+fn default_api_enabled() -> bool {
+    false
+}
+
+fn default_api_port() -> u16 {
+    8080
+}
+
+fn default_show_read_notifications() -> bool {
+    true
 }
 
 impl Default for Config {
@@ -208,6 +232,9 @@ impl Default for Config {
             log_level: default_log_level(),
             log_file_path: None,
             persistent_notifications: default_persistent_notifications(),
+            api_enabled: default_api_enabled(),
+            api_port: default_api_port(),
+            show_read_notifications: default_show_read_notifications(),
         }
     }
 }

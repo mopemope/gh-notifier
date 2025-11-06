@@ -9,11 +9,11 @@ fn test_persistent_notification_config() {
     let mut config = Config::default();
 
     // Check default value
-    assert_eq!(config.persistent_notifications, false);
+    assert!(!config.persistent_notifications);
 
     // Test with persistent notifications enabled
     config.persistent_notifications = true;
-    assert_eq!(config.persistent_notifications, true);
+    assert!(config.persistent_notifications);
 }
 
 #[test]
@@ -75,7 +75,7 @@ fn test_storage_functionality() {
     storage.mark_as_read("test-notification-id").unwrap();
 
     let all_notifications = storage.get_all_notifications().unwrap();
-    assert_eq!(all_notifications[0].is_read, true);
+    assert!(all_notifications[0].is_read);
     assert!(all_notifications[0].marked_read_at.is_some());
 
     // Test unread notifications

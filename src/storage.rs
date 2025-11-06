@@ -200,7 +200,7 @@ mod tests {
         assert_eq!(saved_notifications.len(), 1);
         assert_eq!(saved_notifications[0].id, "test_id_1");
         assert_eq!(saved_notifications[0].title, "Test Title");
-        assert_eq!(saved_notifications[0].is_read, false);
+        assert!(!saved_notifications[0].is_read);
 
         // 通知が既に存在するか確認
         assert!(storage.notification_exists("test_id_1").unwrap());
@@ -210,7 +210,7 @@ mod tests {
         storage.mark_as_read("test_id_1").unwrap();
 
         let updated_notifications = storage.get_all_notifications().unwrap();
-        assert_eq!(updated_notifications[0].is_read, true);
+        assert!(updated_notifications[0].is_read);
         assert!(updated_notifications[0].marked_read_at.is_some());
 
         // 通知のカウントを確認
@@ -263,7 +263,7 @@ mod tests {
         let unread_notifications = storage.get_unread_notifications().unwrap();
         assert_eq!(unread_notifications.len(), 1);
         assert_eq!(unread_notifications[0].id, "test_id_unread");
-        assert_eq!(unread_notifications[0].is_read, false);
+        assert!(!unread_notifications[0].is_read);
 
         // すべての通知を取得
         let all_notifications = storage.get_all_notifications().unwrap();

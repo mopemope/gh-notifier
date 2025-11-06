@@ -10,6 +10,25 @@ pub async fn handle_notification(
     config: &Config,
     history_manager: &HistoryManager,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    // 通知が既に保存されていて既読状態になっているか確認
+    let is_already_read = history_manager
+        .is_notification_read(&notification.id)
+        .unwrap_or(false);
+
+    // 通知が既読なら、表示しない設定があれば通知をスキップする
+    // (ただし、通知を表示するかどうかは設定で制御可能)
+    if is_already_read && !config.show_read_notifications {
+        tracing::debug!(
+            "Notification {} is already read, skipping notification",
+            notification.id
+        );
+        // それでも履歴には保存しておく
+        if let Err(e) = history_manager.save_notification(notification) {
+            tracing::error!("Failed to save notification to history: {}", e);
+        }
+        return Ok(());
+    }
+
     // Create a more specific title with reason information
     let reason_text = get_reason_display_text(&notification.reason);
     let repo_name = if notification.repository.private {
@@ -17,7 +36,13 @@ pub async fn handle_notification(
     } else {
         notification.repository.full_name.clone()
     };
-    let title = format!("{} - {}", repo_name, reason_text);
+
+    // 表示用タイトルに既読状態を反映
+    let title = if is_already_read {
+        format!("[READ] {} - {}", repo_name, reason_text)
+    } else {
+        format!("{} - {}", repo_name, reason_text)
+    };
 
     // Create a more informative body with additional context
     let time_ago_text = format_time_ago(&notification.updated_at);

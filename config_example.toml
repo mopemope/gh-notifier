@@ -116,3 +116,13 @@ batch_interval_sec = 30
 retry_count = 3
 # Interval between retries (in seconds)
 retry_interval_sec = 5
+
+# API server configuration
+[api]
+# Enable the API server for managing notifications (default: false)
+api_enabled = false
+# Port for the API server (default: 8080)
+api_port = 8080
+
+# Notification display configuration
+show_read_notifications = true  # Whether to show read notifications (default: true)
