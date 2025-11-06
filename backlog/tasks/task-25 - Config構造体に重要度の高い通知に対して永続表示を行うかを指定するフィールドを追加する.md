@@ -1,9 +1,10 @@
 ---
 id: task-25
 title: Config構造体に重要度の高い通知に対して永続表示を行うかを指定するフィールドを追加する
-status: To Do
+status: Done
 assignee: []
 created_date: '2025-11-06 22:10'
+updated_date: '2025-11-06 22:30'
 labels:
   - config
   - enhancement
