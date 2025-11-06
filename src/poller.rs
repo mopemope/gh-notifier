@@ -7,6 +7,7 @@ pub trait Notifier: Send + Sync {
         title: &str,
         body: &str,
         url: &str,
+        config: &Config,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>>;
 }
 
@@ -67,17 +68,24 @@ impl Notifier for DesktopNotifier {
         title: &str,
         body: &str,
         url: &str, // url を使用する
+        config: &Config,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        Notification::new()
-            .summary(title)
-            .body(body)
-            .icon("dialog-information") // 任意のアイコン
-            .hint(notify_rust::Hint::Transient(true)) // 通知を自動的に消す
-            .hint(notify_rust::Hint::Custom(
-                "default-action".to_string(),
-                url.to_string(),
-            ))
-            .show()
+        let mut notification = Notification::new();
+        notification.summary(title).body(body).icon("dialog-information");
+
+        // persistent_notifications設定に基づいて通知の永続性を制御
+        if config.persistent_notifications {
+            notification.hint(notify_rust::Hint::Transient(false)); // 永続的（自動消去しない）
+        } else {
+            notification.hint(notify_rust::Hint::Transient(true)); // 一時的（自動消去する）
+        }
+
+        notification.hint(notify_rust::Hint::Custom(
+            "default-action".to_string(),
+            url.to_string(),
+        ));
+
+        notification.show()
             .map_err(|e| Box::new(std::io::Error::other(e)))?;
         Ok(())
     }
@@ -93,6 +101,7 @@ impl Notifier for MacNotifier {
         title: &str,
         body: &str,
         _url: &str, // url は使用していないので、アンダースコア接頭辞を付ける
+        _config: &Config,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         mac_notification_sys::set_application(&"gh-notifier")?;
         mac_notification_sys::send_notification(&title, &Some(&body), &"", &None)?;
@@ -110,15 +119,26 @@ impl Notifier for WindowsNotifier {
         title: &str,
         body: &str,
         url: &str, // url を使用する
+        config: &Config,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         use winrt_notification::Toast;
 
-        Toast::new(Toast::POWERSHELL_APP_ID)
+        let mut toast = Toast::new(Toast::POWERSHELL_APP_ID)
             .title(&title)
             .text1(&body)
             .activation_type(winrt_notification::ActivationType::Protocol)
-            .launch(&url)
-            .show()
+            .launch(&url);
+
+        // persistent_notifications設定に基づいて通知の永続性を制御
+        if config.persistent_notifications {
+            // 永続的通知（スリープ状態でも表示）
+            toast = toast.duration(winrt_notification::Duration::Long);
+        } else {
+            // 通常通知（短め）
+            toast = toast.duration(winrt_notification::Duration::Default);
+        }
+
+        toast.show()
             .map_err(|e| Box::new(std::io::Error::other(e)))?;
 
         Ok(())
@@ -134,8 +154,10 @@ impl Notifier for DummyNotifier {
         title: &str,
         body: &str,
         url: &str,
+        config: &Config,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        println!("Notification: {} - {} (URL: {})", title, body, url);
+        let persistence_status = if config.persistent_notifications { "persistent" } else { "transient" };
+        println!("Notification: {} - {} (URL: {}, Status: {})", title, body, url, persistence_status);
         Ok(())
     }
 }
@@ -153,6 +175,7 @@ mod tests {
             title: &str,
             body: &str,
             url: &str,
+            _config: &Config,
         ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             println!("Notification: {} - {} (URL: {})", title, body, url);
             Ok(())
@@ -253,8 +276,9 @@ mod tests {
     #[test]
     fn test_desktop_notifier_send_notification() {
         let notifier = DesktopNotifier;
+        let config = crate::Config::default();
         // テストでは通知を表示しないが、エラーが発生しないことを確認
-        let result = notifier.send_notification("Test Title", "Test Body", "https://example.com");
+        let result = notifier.send_notification("Test Title", "Test Body", "https://example.com", &config);
         assert!(result.is_ok());
     }
 
@@ -262,8 +286,9 @@ mod tests {
     #[test]
     fn test_windows_notifier_send_notification() {
         let notifier = WindowsNotifier;
+        let config = crate::Config::default();
         // テストでは通知を表示しないが、エラーが発生しないことを確認
-        let result = notifier.send_notification("Test Title", "Test Body", "https://example.com");
+        let result = notifier.send_notification("Test Title", "Test Body", "https://example.com", &config);
         assert!(result.is_ok());
     }
 }

@@ -1,5 +1,5 @@
 use crate::poller::Notifier;
-use crate::{GitHubClient, Notification};
+use crate::{Config, GitHubClient, Notification};
 use chrono::{DateTime, Local, Utc};
 
 /// 通知を Notifier に渡して表示し、必要に応じて既読にする
@@ -7,7 +7,7 @@ pub async fn handle_notification(
     notification: &Notification,
     notifier: &dyn Notifier,
     github_client: &mut GitHubClient,
-    mark_as_read_on_notify: bool,
+    config: &Config,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // Create a more specific title with reason information
     let reason_text = get_reason_display_text(&notification.reason);
@@ -34,9 +34,9 @@ pub async fn handle_notification(
         url
     );
 
-    notifier.send_notification(&title, &body, url)?;
+    notifier.send_notification(&title, &body, url, config)?;
 
-    if mark_as_read_on_notify {
+    if config.mark_as_read_on_notify {
         github_client
             .mark_notification_as_read(&notification.id)
             .await?;
@@ -118,6 +118,7 @@ mod tests {
             _title: &str,
             _body: &str,
             _url: &str,
+            _config: &Config,
         ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             Ok(())
         }
@@ -126,7 +127,7 @@ mod tests {
     #[tokio::test]
     #[ignore] // 認証トークンがないとテストできないため
     async fn test_handle_notification() {
-        let _config = Config::default();
+        let config = Config::default();
         let auth_manager = AuthManager::new().unwrap();
         let mut github_client = GitHubClient::new(auth_manager).unwrap();
         let notification = Notification {
@@ -153,7 +154,7 @@ mod tests {
         };
         let notifier: &dyn crate::poller::Notifier = &DummyNotifier;
 
-        let result = handle_notification(&notification, notifier, &mut github_client, false).await;
+        let result = handle_notification(&notification, notifier, &mut github_client, &config).await;
         assert!(result.is_ok());
     }
 }

@@ -258,6 +258,7 @@ exclude_participating = true  # 自分が参加しているスレッドの通知
 - `mark_as_read_on_notify`: trueにすると、通知表示時に自動的にGitHub上で通知を既読に設定します。
 - `log_level`: ログの詳細度（info, debug, warn, error）。デフォルトはinfo。
 - `log_file_path`: ログファイルの保存パス（省略可能、デフォルト: データディレクトリ下の logs/gh-notifier.log）
+- `persistent_notifications`: trueにすると、通知が自動的に消えないようになり、手動で閉じるまで表示され続けます（デフォルト: false）。デスクトップ通知を見落としやすい環境での使用に適しています。
 
 ### 通知フィルタリングオプション
 

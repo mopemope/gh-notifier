@@ -15,6 +15,9 @@ mark_as_read_on_notify = false
 log_level = "info"
 # log_file_path = "/path/to/gh-notifier.log"  # Optional: specify custom log file path
 
+# Notification display configuration
+persistent_notifications = false  # Set to true to make notifications persistent (do not auto-dismiss)
+
 # Notification filter configuration
 [notification_filters]
 

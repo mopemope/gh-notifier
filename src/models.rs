@@ -88,6 +88,21 @@ pub struct NotificationRepository {
     pub private: bool,
 }
 
+// --- 永続化用通知データモデル ---
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PersistedNotification {
+    pub id: String,              // GitHubの通知ID
+    pub title: String,           // 通知タイトル
+    pub body: String,            // 通知本文
+    pub url: String,             // 関連URL
+    pub repository: String,      // リポジトリ名
+    pub reason: String,          // 通知理由（例: review_requested, mention など）
+    pub subject_type: String,    // 通知対象タイプ（例: PullRequest, Issue など）
+    pub is_read: bool,           // 既読状態
+    pub received_at: String,     // 受信日時
+    pub marked_read_at: Option<String>, // 既読にした日時
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

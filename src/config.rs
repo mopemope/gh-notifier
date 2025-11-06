@@ -166,6 +166,10 @@ pub struct Config {
     /// ログファイルのパス（省略可、デフォルト: データディレクトリ下の logs/gh-notifier.log）
     #[serde(default)]
     pub log_file_path: Option<String>,
+
+    /// 通知を永続的に表示するかどうか（自動消去しない）
+    #[serde(default = "default_persistent_notifications")]
+    pub persistent_notifications: bool,
 }
 
 // デフォルト値の定義
@@ -179,6 +183,10 @@ fn default_mark_as_read_on_notify() -> bool {
 
 fn default_log_level() -> String {
     "info".to_string()
+}
+
+fn default_persistent_notifications() -> bool {
+    false  // デフォルトでは現在の挙動（自動消去）を維持
 }
 
 impl Default for Config {
@@ -199,6 +207,7 @@ impl Default for Config {
             polling_error_handling_config: PollingErrorHandlingConfig::default(),
             log_level: default_log_level(),
             log_file_path: None,
+            persistent_notifications: default_persistent_notifications(),
         }
     }
 }

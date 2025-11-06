@@ -77,7 +77,7 @@ pub async fn run_polling_loop(
                                 notification,
                                 notifier,
                                 github_client,
-                                config.mark_as_read_on_notify,
+                                config,
                             )
                             .await
                             {
@@ -178,7 +178,7 @@ pub async fn run_polling_loop_with_shutdown(
                                         notification,
                                         notifier,
                                         github_client,
-                                        config.mark_as_read_on_notify,
+                                        config,
                                     )
                                     .await
                                     {
@@ -229,7 +229,7 @@ async fn process_batch(
             notification,
             notifier,
             github_client,
-            config.mark_as_read_on_notify,
+            config,
         )
         .await
         {
@@ -253,6 +253,7 @@ mod tests {
             _title: &str,
             _body: &str,
             _url: &str,
+            _config: &Config,
         ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             Ok(())
         }
