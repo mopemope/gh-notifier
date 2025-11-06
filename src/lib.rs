@@ -24,10 +24,7 @@ pub use github_client::GitHubClient;
 pub use initialization_service::AppInitializationService;
 pub use initializer::InitializedApp; // Keep this only if not redefined elsewhere
 pub use logger::setup_logging;
-pub use models::{
-    DeviceAuthResponse, ErrorResponse, Notification, NotificationRepository, NotificationSubject,
-    TokenInfo, TokenResponse,
-};
+pub use models::{Notification, NotificationRepository, NotificationSubject, TokenInfo};
 pub use poller::{DesktopNotifier, Poller};
 pub use polling::{filter_new_notifications, handle_notification, run_polling_loop};
 pub use runtime::run_polling_loop_with_shutdown;

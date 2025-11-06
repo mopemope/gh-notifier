@@ -155,10 +155,6 @@ pub struct Config {
     #[serde(default)]
     pub polling_error_handling_config: PollingErrorHandlingConfig,
 
-    /// GitHub OAuth Client ID（省略可）
-    #[serde(default = "default_client_id")]
-    pub client_id: String,
-
     /// ログレベル（省略可、デフォルト: info）
     #[serde(default = "default_log_level")]
     pub log_level: String,
@@ -175,11 +171,6 @@ fn default_poll_interval_sec() -> u64 {
 
 fn default_mark_as_read_on_notify() -> bool {
     false
-}
-
-fn default_client_id() -> String {
-    // 仕様書で示されたデフォルトクライアントID
-    "Iv1.898a6d2a86c3f7aa".to_string()
 }
 
 fn default_log_level() -> String {
@@ -199,7 +190,6 @@ impl Default for Config {
             notification_filters,
             notification_batch_config: NotificationBatchConfig::default(),
             polling_error_handling_config: PollingErrorHandlingConfig::default(),
-            client_id: default_client_id(),
             log_level: default_log_level(),
             log_file_path: None,
         }
@@ -253,7 +243,6 @@ mod tests {
         let config = Config::default();
         assert_eq!(config.poll_interval_sec, 30);
         assert!(!config.mark_as_read_on_notify);
-        assert_eq!(config.client_id, "Iv1.898a6d2a86c3f7aa");
     }
 
     #[test]
@@ -262,7 +251,6 @@ mod tests {
         let serialized = toml::to_string_pretty(&config).unwrap();
         assert!(serialized.contains("poll_interval_sec = 30"));
         assert!(serialized.contains("mark_as_read_on_notify = false"));
-        assert!(serialized.contains("client_id = \"Iv1.898a6d2a86c3f7aa\""));
     }
 
     #[test]
@@ -270,12 +258,10 @@ mod tests {
         let toml_str = r#"
             poll_interval_sec = 60
             mark_as_read_on_notify = true
-            client_id = "custom-client-id"
         "#;
         let config: Config = toml::from_str(toml_str).unwrap();
         assert_eq!(config.poll_interval_sec, 60);
         assert!(config.mark_as_read_on_notify);
-        assert_eq!(config.client_id, "custom-client-id");
     }
 
     #[test]
@@ -286,7 +272,6 @@ mod tests {
         let config: Config = toml::from_str(toml_str).unwrap();
         assert_eq!(config.poll_interval_sec, 45);
         assert!(!config.mark_as_read_on_notify); // デフォルト
-        assert_eq!(config.client_id, "Iv1.898a6d2a86c3f7aa"); // デフォルト
     }
 
     #[test]
@@ -310,14 +295,12 @@ mod tests {
         let toml_str = r#"
             poll_interval_sec = 60
             mark_as_read_on_notify = true
-            client_id = "custom-client-id"
             log_level = "warn"
         "#;
         let config: Config = toml::from_str(toml_str).unwrap();
         assert_eq!(config.log_level, "warn");
         assert_eq!(config.poll_interval_sec, 60);
         assert!(config.mark_as_read_on_notify);
-        assert_eq!(config.client_id, "custom-client-id");
     }
 
     #[tokio::test]
@@ -326,7 +309,6 @@ mod tests {
         let config = Config::default();
         assert_eq!(config.poll_interval_sec, 30);
         assert!(!config.mark_as_read_on_notify);
-        assert_eq!(config.client_id, "Iv1.898a6d2a86c3f7aa");
         assert_eq!(config.log_level, "info");
     }
 }

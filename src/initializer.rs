@@ -119,6 +119,5 @@ mod tests {
         // Just test that the struct exists and has the expected fields
         // We can't actually create real instances due to system dependencies,
         // so we just verify the struct definition compiles
-        assert!(true);
     }
 }

@@ -80,7 +80,7 @@ mod tests {
         // but we can test that the trait is properly implemented
         let _handler: Box<dyn ExitHandler> = Box::new(DefaultExitHandler);
         // We can't call handler.exit() in tests as it would terminate the test
-        assert!(true); // Just verify the trait can be constructed
+        // Just verify the trait can be constructed
     }
 
     #[test]
@@ -89,7 +89,7 @@ mod tests {
         // Test that the trait methods are accessible
         handler.print("Test message");
         handler.eprint("Test error message");
-        assert!(true); // Basic functionality test
+        // Basic functionality test
     }
 
     #[test]
@@ -97,7 +97,7 @@ mod tests {
         let provider: Box<dyn ConfigProvider> = Box::new(DefaultConfigProvider);
         // This might fail if no config file exists, so we just check that the trait is implemented
         let _ = provider.load_config(); // May return Ok or Err depending on config availability
-        assert!(true);
+        // Just check the trait is implemented
     }
 
     #[test]

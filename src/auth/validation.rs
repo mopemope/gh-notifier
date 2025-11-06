@@ -1,91 +1,34 @@
 use crate::AuthError;
 use secrecy::ExposeSecret;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 impl super::AuthManager {
     /// Checks if the access token has expired
+    /// For PATs, this always returns false since they don't expire by default
     pub fn is_access_token_expired(&self) -> bool {
-        if let Some(ref token_info) = self.token_info {
-            if let Some(expires_at) = token_info.expires_at {
-                let now = SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap()
-                    .as_secs();
-                let expired = now >= expires_at;
-                tracing::debug!(
-                    "Token expiration check: now={}, expires_at={}, expired={}",
-                    now,
-                    expires_at,
-                    expired
-                );
-                return expired;
-            }
-            // If token exists but has no expiration time, assume it doesn't expire
-            tracing::debug!("Token has no expiration time, assuming not expired");
-            return false;
-        }
-        // If there's no token at all, it's considered expired
-        tracing::debug!("No token available, considering expired");
-        true
+        // PATs don't expire by default, so return false
+        // Only return true if there's no token at all
+        self.token_info.is_none()
     }
 
     /// Checks if the access token will expire soon (within the specified number of seconds)
-    pub fn is_access_token_expiring_soon(&self, within_seconds: u64) -> bool {
-        if let Some(ref token_info) = self.token_info {
-            if let Some(expires_at) = token_info.expires_at {
-                let now = SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap()
-                    .as_secs();
-
-                // Check if the token will expire within the specified time window
-                let expiring_soon = now + within_seconds >= expires_at;
-                tracing::debug!(
-                    "Token expiring soon check: now={}, expires_at={}, within_seconds={}, expiring_soon={}",
-                    now,
-                    expires_at,
-                    within_seconds,
-                    expiring_soon
-                );
-                return expiring_soon;
-            }
-            // If token exists but has no expiration time, it won't expire soon
-            tracing::debug!("Token has no expiration time, assuming not expiring soon");
-            return false;
-        }
-        // If there's no token at all, then it's expiring soon (meaning we need to get one)
-        tracing::debug!("No token available, considering expiring soon");
-        true
+    /// For PATs, this always returns false since they don't expire by default
+    pub fn is_access_token_expiring_soon(&self, _within_seconds: u64) -> bool {
+        // PATs don't expire by default, so return false
+        // Only return true if there's no token at all
+        self.token_info.is_none()
     }
 
     /// Checks if the refresh token has expired
+    /// For PATs, this always returns true since they don't have refresh tokens
     pub fn is_refresh_token_expired(&self) -> bool {
-        if let Some(ref token_info) = self.token_info
-            && let Some(refresh_expires_at) = token_info.refresh_token_expires_at
-        {
-            let now = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_secs();
-            return now >= refresh_expires_at;
-        }
-        // If there's no refresh token or expiration, assume it's expired
-        self.token_info
-            .as_ref()
-            .and_then(|t| t.refresh_token.as_ref())
-            .is_none()
+        // PATs don't have refresh tokens
+        true
     }
 
     /// Validates the current token by making a request to GitHub's API
     /// This is useful to determine if a token is actually valid or if re-auth is needed
     pub async fn validate_token(&self) -> Result<bool, AuthError> {
         if let Some(ref token_info) = self.token_info {
-            // First, check if token is expired before making network call
-            if self.is_access_token_expired() {
-                tracing::debug!("Token validation failed: token is expired");
-                return Ok(false);
-            }
-
             let client = reqwest::Client::builder()
                 .user_agent(format!("gh-notifier/{}", env!("CARGO_PKG_VERSION")))
                 .build()

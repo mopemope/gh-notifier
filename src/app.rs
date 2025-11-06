@@ -163,6 +163,5 @@ mod tests {
 
         // We can't really test the exit behavior in async tests, so we'll just test the structure
         // This test can't fully validate the exit behavior, but it tests that the method exists
-        assert!(true);
     }
 }

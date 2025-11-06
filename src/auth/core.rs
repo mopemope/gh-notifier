@@ -1,10 +1,6 @@
 use crate::{AuthError, TokenInfo, token_storage::TokenStorage};
 
-pub const GITHUB_DEVICE_AUTHORIZATION_URL: &str = "https://github.com/login/device/code";
-pub const GITHUB_TOKEN_URL: &str = "https://github.com/login/oauth/access_token";
-
 pub struct AuthManager {
-    pub client_id: String,
     pub token_info: Option<TokenInfo>,
     pub(in crate::auth) token_storage: TokenStorage,
 }
@@ -15,12 +11,7 @@ impl AuthManager {
         // Create the token storage with fallback mechanisms
         let token_storage = TokenStorage::new()?;
 
-        // Load the config to get the client ID
-        let config = crate::config::load_config()
-            .map_err(|e| AuthError::GeneralError(format!("Failed to load config: {}", e)))?;
-
         Ok(AuthManager {
-            client_id: config.client_id,
             token_info: None,
             token_storage,
         })
@@ -38,12 +29,7 @@ impl AuthManager {
             token_file_path,
         };
 
-        // Load the config to get the client ID
-        let config = crate::config::load_config()
-            .map_err(|e| AuthError::GeneralError(format!("Failed to load config: {}", e)))?;
-
         Ok(AuthManager {
-            client_id: config.client_id,
             token_info: None,
             token_storage,
         })

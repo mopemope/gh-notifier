@@ -56,31 +56,6 @@ where
     Ok(opt.map(SecretString::new))
 }
 
-#[derive(Debug, Deserialize, Serialize)]
-pub struct DeviceAuthResponse {
-    pub device_code: String,
-    pub user_code: String,
-    pub verification_uri: String,
-    pub expires_in: u64, // How long until the device code expires (in seconds)
-    pub interval: u64,   // Polling interval (in seconds)
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct TokenResponse {
-    pub access_token: String,
-    pub token_type: String,
-    pub expires_in: Option<u64>, // Optional field for access token expiry
-    pub refresh_token: Option<String>,
-    pub refresh_token_expires_in: Option<u64>, // Optional field for refresh token expiry
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct ErrorResponse {
-    pub error: String,
-    pub error_description: Option<String>,
-    pub error_uri: Option<String>,
-}
-
 // --- GitHub API 通知モデル ---
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Notification {
@@ -191,65 +166,5 @@ mod tests {
         // Verify we can't directly access the secret in a serialized form
         let exposed = secret.expose_secret();
         assert_eq!(exposed, "my_secret");
-    }
-
-    #[tokio::test]
-    async fn test_device_auth_response_deserialization() {
-        let json_response = r#"
-        {
-            "device_code": "test_device_code",
-            "user_code": "ABCD-EFGH",
-            "verification_uri": "https://github.com/login/device",
-            "expires_in": 900,
-            "interval": 5
-        }
-        "#;
-
-        let response: DeviceAuthResponse = serde_json::from_str(json_response).unwrap();
-        assert_eq!(response.device_code, "test_device_code");
-        assert_eq!(response.user_code, "ABCD-EFGH");
-        assert_eq!(response.verification_uri, "https://github.com/login/device");
-        assert_eq!(response.expires_in, 900);
-        assert_eq!(response.interval, 5);
-    }
-
-    #[tokio::test]
-    async fn test_token_response_deserialization() {
-        let json_response = r#"
-        {
-            "access_token": "gho_test_token",
-            "token_type": "bearer",
-            "expires_in": 3600,
-            "refresh_token": "ghr_test_refresh_token",
-            "refresh_token_expires_in": 15768000
-        }
-        "#;
-
-        let response: TokenResponse = serde_json::from_str(json_response).unwrap();
-        assert_eq!(response.access_token, "gho_test_token");
-        assert_eq!(response.token_type, "bearer");
-        assert_eq!(response.expires_in, Some(3600));
-        assert_eq!(
-            response.refresh_token,
-            Some("ghr_test_refresh_token".to_string())
-        );
-        assert_eq!(response.refresh_token_expires_in, Some(15768000));
-    }
-
-    #[tokio::test]
-    async fn test_error_response_deserialization() {
-        let json_response = r#"
-        {
-            "error": "authorization_pending",
-            "error_description": "Authorization pending"
-        }
-        "#;
-
-        let response: ErrorResponse = serde_json::from_str(json_response).unwrap();
-        assert_eq!(response.error, "authorization_pending");
-        assert_eq!(
-            response.error_description,
-            Some("Authorization pending".to_string())
-        );
     }
 }

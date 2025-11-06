@@ -1,14 +1,13 @@
 # GitHubリアルタイムデスクトップ通知デーモン (gh-notifier)
 
-Rustで構築された軽量デーモンアプリケーションで、GitHub通知のリアルタイム（または準リアルタイム）デスクトップ通知を提供します。個人用アクセストークン（PAT）を手動で生成する必要をなくす、安全なGitHub OAuth Device Flow認証方式を採用しています。
+Rustで構築された軽量デーモンアプリケーションで、GitHub通知のリアルタイム（または準リアルタイム）デスクトップ通知を提供します。GitHub Personal Access Token (PAT) を使用した安全な認証方式を採用しています。
 
 ## 機能
 
 - **リアルタイムGitHub通知**: Issue、プルリクエスト、メンションなどに関する通知をリアルタイムで受信します。
 - **ネイティブデスクトップ通知**: Linux（D-Bus）、macOS（NSUserNotification）、Windows（ToastNotification）のネイティブ通知システムと統合します。
-- **OAuth Device Flow認証**: 手動での個人用アクセストークン生成を必要としない安全な認証。
+- **PAT (Personal Access Token) 認証**: GitHub Personal Access Token を使用した安全な認証。
 - **安全なトークン保存**: アクセストークンはOSキーチェーン（macOS Keychain、Windowsクレデンシャルボルト、Linux libsecret）に安全に保存されます。
-- **自動トークン更新**: トークンの期限切れ時に自動的に更新します。
 - **低リソース使用**: CPUやメモリ消費が最小限の軽量デーモンです。
 - **クロスプラットフォーム**: Linux（GNOME/KDE）、macOS、Windows 10/11で動作。
 - **構成可能なポーリング**: 通知ポーリング間隔やフィルタリング設定が可能です。
@@ -19,7 +18,7 @@ Rustで構築された軽量デーモンアプリケーションで、GitHub通�
 アプリケーションは以下の主要コンポーネントで構成されています：
 
 - `Config` - TOMLファイルからの設定読み込みと管理
-- `AuthManager` - OAuth Device Flowの処理、トークンの保存と更新、OSキーチェーン操作
+- `AuthManager` - PAT認証の処理、トークンの保存と検証、OSキーチェーン操作
 - `GitHubClient` - 認証済みHTTPクライアント（自動トークン付与）
 - `Poller` - 通知ポーリングと通知送信
 - `Notifier` - OS依存の通知送信
@@ -53,18 +52,29 @@ cargo build --release
 
 ### 初期設定と認証
 
-初回実行時に、GitHubのOAuth Device Flowを使用した認証プロンプトが表示されます：
+初回実行時に、GitHub Personal Access Token を入力するプロンプトが表示されます：
 
 1. ターミナル上で `./target/release/gh-notifier` を実行
 2. アプリケーションが以下のように表示します：
    ```
    GitHub Notifier starting...
-   No existing token found, starting OAuth Device Flow...
-   No authentication token found. Starting authentication process...
+   No stored Personal Access Token found. Starting authentication process...
+   GitHub Personal Access Token Authentication
+   Please enter your GitHub Personal Access Token.
+   If you don't have one, create it at: https://github.com/settings/tokens
+   Make sure to grant the 'notifications' scope for this application.
    ```
-3. GitHubから認証コードとURLが提供されます
-4. 指示に従ってWebブラウザでURLにアクセスし、コードを入力してGitHubアカウントで認証し、アプリケーションを承認します
-5. アプリケーションがトークンを受信し、OSのキーチェーンに安全に保存します
+3. GitHub Personal Access Token を入力します（画面には表示されません）
+4. アプリケーションがトークンを検証し、OSのキーチェーンに安全に保存します
+
+### Personal Access Token の作成方法
+
+1. GitHubの [Personal Access Token](https://github.com/settings/tokens) ページにアクセス
+2. 「Generate new token」または「Fine-grained personal access token」を選択
+3. 以下の権限を付与:
+   - `notifications` - 通知の読み取り
+   - `repo` (オプション) - 通知を既読にする場合
+4. 生成されたトークンをコピーし、アプリケーションのプロンプトに入力
 
 ### 実行
 
@@ -96,7 +106,6 @@ pkill -TERM gh-notifier
 ```toml
 poll_interval_sec = 30                    # 通知ポーリング間隔（秒）
 mark_as_read_on_notify = false           # 通知表示時に既読にするか
-client_id = "Iv1.898a6d2a86c3f7aa"      # GitHub OAuth App Client ID
 log_level = "info"                       # ログレベル（info, debug, warn, error）
 log_file_path = ""                       # ログファイルの保存パス（省略可能）
 
@@ -207,7 +216,6 @@ exclude_participating = true  # 自分が参加しているスレッドの通知
 - `mark_as_read_on_notify`: trueにすると、通知表示時に自動的にGitHub上で通知を既読に設定します。
 - `log_level`: ログの詳細度（info, debug, warn, error）。デフォルトはinfo。
 - `log_file_path`: ログファイルの保存パス（省略可能、デフォルト: データディレクトリ下の logs/gh-notifier.log）
-- `client_id`: GitHub OAuthアプリケーションのクライアントID。デフォルトは組み込みのID。
 
 ### 通知フィルタリングオプション
 
@@ -248,25 +256,22 @@ exclude_participating = true  # 自分が参加しているスレッドの通知
 - `security_alert`: セキュリティアラート
 - `state_change`: 自分が関連するIssue/Pull Requestの状態変更（オープン、クローズなど）
 - `subscribed`: 購読しているリポジトリでのアクティビティ
-- `team_mention`: 自分のチームへのメンション
 
 ## セキュリティ
 
 - トークンはOSキーチェーンに安全に保存されます
-- アクセストークンは期限切れ時に自動的に更新されます
 - トークンはログに出力されたり公開されたりすることはありません
 - ファイルパーミッションは安全に設定されています
-- OAuth Device Flow認証により、個人用アクセストークンの手動作成が不要です
+- Personal Access Token 認証により、安全なアクセスを実現
 
 ## 技術的詳細
 
 - **ポーリング方式**: ETagおよびIf-Modified-Sinceヘッダーを使用した効率的なポーリングを行うGitHub REST API v3 `/notifications`エンドポイント
-- **認証スコープ**: 通知の読み取りに`notifications`スコープが必要、既読に設定する場合はオプションで`repo`スコープ
+- **認証方式**: PAT (Personal Access Token) 認証、`notifications` スコープが必要
 - **ログ**: `tracing`クレートによる構造化ログ（ファイル出力もサポート）
 - **非同期ランタイム**: 非同期操作のためのTokioベース
 - **シャットダウン処理**: SIGINT/SIGTERMシグナルをキャッチして安全に終了するイベントループ
 - **タスク管理**: `tokio::spawn`を使用した非同期タスクの実行
-- **トークン管理**: トークンの有効期限が切れる5分前までに自動的に更新（予防的リフレッシュ）
 - **フィルタリング**: 様々なフィルタリング条件に基づいた高度な通知フィルタリング
 - **バッチ処理**: 通知のバッチ処理機能（設定可能なバッチサイズと間隔）
 - **エラーハンドリング**: ポーリングエラーに対する再試行ロジック（設定可能な回数と間隔）
@@ -274,8 +279,8 @@ exclude_participating = true  # 自分が参加しているスレッドの通知
 ## トラブルシューティング
 
 ### 認証に関する問題
-- 最初の認証時にGitHubで承認を拒否すると、再度OAuthフローを実行する必要があります
-- トークンの有効期限切れ時には、自動的に再認証プロセスが開始されます
+- 初回認証時にPersonal Access Tokenが無効な場合、再入力を求められます
+- トークンの権限が不足している場合、特定のAPI機能が利用できません
 
 ### 通知に関する問題
 - 通知が表示されない場合は、OSの通知設定が有効であることを確認してください

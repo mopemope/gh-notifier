@@ -48,13 +48,12 @@ impl<'a> AppInitializationService<'a> {
             Err(e) => {
                 tracing::error!("Failed to get valid token: {}", e);
                 self.message_handler.eprint(
-                    "Failed to validate existing token. This may be due to an invalid or unconfigured GitHub OAuth client ID."
+                    "Failed to validate authentication token. This may be due to an invalid Personal Access Token."
                 );
+                self.message_handler
+                    .eprint("The stored token may be invalid or have insufficient permissions.");
                 self.message_handler.eprint(
-                    "The existing token may be invalid, or the client ID may need to be updated.",
-                );
-                self.message_handler.eprint(
-                    "Please check your configuration and ensure you have a valid client_id set.",
+                    "Please make sure your Personal Access Token has the 'notifications' scope.",
                 );
                 self.exit_handler.exit(1);
             }
