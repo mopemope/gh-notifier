@@ -148,6 +148,10 @@ batch_interval_sec = 30                  # バッチ処理の間隔（秒）
 retry_count = 3                          # エラー発生時の再試行回数
 retry_interval_sec = 5                   # 再試行間隔（秒）
 
+# 重要度に基づく通知設定
+important_notification_reasons = []       # 重要度の高い通知理由のリスト（例: ["review_requested", "mention"]）
+persistent_important_notifications = false  # 重要度の高い通知を永続的に表示するかどうか
+
 
 ```
 
@@ -259,6 +263,8 @@ exclude_participating = true  # 自分が参加しているスレッドの通知
 - `log_level`: ログの詳細度（info, debug, warn, error）。デフォルトはinfo。
 - `log_file_path`: ログファイルの保存パス（省略可能、デフォルト: データディレクトリ下の logs/gh-notifier.log）
 - `persistent_notifications`: trueにすると、通知が自動的に消えないようになり、手動で閉じるまで表示され続けます（デフォルト: false）。デスクトップ通知を見落としやすい環境での使用に適しています。
+- `important_notification_reasons`: 重要度の高い通知理由のリスト。このリストに含まれる理由の通知は、重要度に基づいた特別な処理の対象になります（例: `["review_requested", "mention"]`）。デフォルトでは空のリストで、重要度に基づく特別な処理は行われません。
+- `persistent_important_notifications`: trueにすると、`important_notification_reasons`に含まれる理由の通知が永続的に表示され、手動で閉じるまで消えません（デフォルト: false）。重要度の高い通知を見落としにくいようにする機能です。
 
 ### 通知フィルタリングオプション
 

@@ -22,8 +22,13 @@ fn test_desktop_notifier_uses_persistent_config() {
     let notifier = DesktopNotifier;
 
     // Test notification with default (non-persistent) config
-    let result =
-        notifier.send_notification("Test Title", "Test Body", "https://example.com", &config);
+    let result = notifier.send_notification(
+        "Test Title",
+        "Test Body",
+        "https://example.com",
+        "mention",
+        &config,
+    );
     assert!(result.is_ok());
 
     // Test notification with persistent config
@@ -34,6 +39,7 @@ fn test_desktop_notifier_uses_persistent_config() {
         "Test Title",
         "Test Body",
         "https://example.com",
+        "mention",
         &persistent_config,
     );
     assert!(result.is_ok());

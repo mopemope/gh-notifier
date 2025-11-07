@@ -1,9 +1,10 @@
 ---
 id: task-28
 title: handle_notification関数内で重要度に応じた永続表示を行うかを判定するロジックを追加する
-status: To Do
+status: Done
 assignee: []
 created_date: '2025-11-06 22:10'
+updated_date: '2025-11-07 01:09'
 labels:
   - handler
   - enhancement

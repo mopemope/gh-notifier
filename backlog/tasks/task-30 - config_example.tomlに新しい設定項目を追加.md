@@ -1,9 +1,10 @@
 ---
 id: task-30
 title: config_example.tomlに新しい設定項目を追加
-status: To Do
+status: Done
 assignee: []
 created_date: '2025-11-06 22:10'
+updated_date: '2025-11-07 01:33'
 labels:
   - config
   - documentation

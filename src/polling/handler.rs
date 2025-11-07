@@ -60,7 +60,7 @@ pub async fn handle_notification(
         url
     );
 
-    notifier.send_notification(&title, &body, url, config)?;
+    notifier.send_notification(&title, &body, url, &notification.reason, config)?;
 
     // 通知を履歴に保存（重複チェック付き）
     if let Err(e) = history_manager.save_notification(notification) {
@@ -149,6 +149,7 @@ mod tests {
             _title: &str,
             _body: &str,
             _url: &str,
+            _notification_reason: &str,
             _config: &Config,
         ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             Ok(())
@@ -200,5 +201,93 @@ mod tests {
         )
         .await;
         assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_handle_notification_with_importance_logic() {
+        use std::sync::{Arc, Mutex};
+        use tempfile::tempdir;
+
+        // Create a mock notifier that captures the notification reason passed to it
+        struct MockNotifier {
+            captured_reasons: Arc<Mutex<Vec<String>>>,
+        }
+
+        impl crate::poller::Notifier for MockNotifier {
+            fn send_notification(
+                &self,
+                _title: &str,
+                _body: &str,
+                _url: &str,
+                notification_reason: &str,
+                _config: &Config,
+            ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+                self.captured_reasons
+                    .lock()
+                    .unwrap()
+                    .push(notification_reason.to_string());
+                Ok(())
+            }
+        }
+
+        let captured_reasons = Arc::new(Mutex::new(Vec::new()));
+        let mock_notifier = MockNotifier {
+            captured_reasons: captured_reasons.clone(),
+        };
+
+        let config = Config {
+            important_notification_reasons: vec!["review_requested".to_string()],
+            persistent_important_notifications: true,
+            persistent_notifications: false,
+            ..Config::default()
+        };
+
+        let notification = Notification {
+            id: "1".to_string(),
+            unread: true,
+            reason: "review_requested".to_string(), // This is an important reason
+            updated_at: "2023-01-02T00:00:00Z".to_string(),
+            last_read_at: None,
+            subject: NotificationSubject {
+                title: "Test notification".to_string(),
+                url: Some("https://example.com/1".to_string()),
+                latest_comment_url: None,
+                kind: "PullRequest".to_string(),
+            },
+            repository: NotificationRepository {
+                id: 1,
+                node_id: "node1".to_string(),
+                name: "repo1".to_string(),
+                full_name: "user/repo1".to_string(),
+                private: false,
+            },
+            url: "https://example.com/1".to_string(),
+            subscription_url: "https://example.com/subscription/1".to_string(),
+        };
+
+        // Mock GitHub client that doesn't make real API calls
+        let auth_manager = AuthManager::new().unwrap();
+        let mut github_client = GitHubClient::new(auth_manager).unwrap();
+
+        // Test with an important notification
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("test.db");
+        let history_manager = crate::HistoryManager::new(&db_path).unwrap();
+
+        let result = handle_notification(
+            &notification,
+            &mock_notifier,
+            &mut github_client,
+            &config,
+            &history_manager,
+        )
+        .await;
+
+        assert!(result.is_ok());
+
+        // Verify that the notification reason was passed correctly to the notifier
+        let captured = captured_reasons.lock().unwrap();
+        assert!(!captured.is_empty());
+        assert_eq!(captured[0], "review_requested");
     }
 }

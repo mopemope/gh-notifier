@@ -103,6 +103,17 @@ exclude_participating = false
 # Example: "1h" = last hour, "30m" = last 30 minutes, "2d" = last 2 days
 minimum_updated_time = "24h"  # Only show notifications from the last 24 hours
 
+# Importance-based notification configuration
+# Specify notification reasons that should be treated as high importance
+important_notification_reasons = [
+  "review_requested",
+  "mention",
+  "assign"
+]  # Notification reasons that are considered high importance (empty list means no importance-based handling)
+
+# Persistent display for important notifications
+persistent_important_notifications = true  # Set to true to make important notifications persistent (do not auto-dismiss)
+
 # Notification batching configuration
 [notification_batch_config]
 # Batch size: number of notifications to group together (0 to disable batching)

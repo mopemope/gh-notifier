@@ -141,6 +141,7 @@ async fn perform_notification_recovery(
                     &title,
                     &body,
                     &notification.url,
+                    &notification.reason,
                     &initialized_app.config,
                 ) {
                     tracing::warn!("Failed to send recovery notification: {}", e);

@@ -234,6 +234,23 @@ fn default_notification_recovery_window_hours() -> u64 {
     24 // Default to 24 hours
 }
 
+impl Config {
+    /// 通知の理由が重要度の高いものであるかを判定する
+    pub fn is_important_notification_reason(&self, reason: &str) -> bool {
+        self.important_notification_reasons
+            .contains(&reason.to_string())
+    }
+
+    /// 通知が重要度の高いものであるかを判定し、それに応じた永続表示設定値を返す
+    pub fn get_persistent_setting_for_notification(&self, reason: &str) -> bool {
+        if self.is_important_notification_reason(reason) {
+            self.persistent_important_notifications
+        } else {
+            self.persistent_notifications
+        }
+    }
+}
+
 impl Default for Config {
     fn default() -> Self {
         // デフォルトでは自分宛てのPRレビュー依頼の通知のみを表示
@@ -377,5 +394,102 @@ mod tests {
         assert_eq!(config.poll_interval_sec, 30);
         assert!(!config.mark_as_read_on_notify);
         assert_eq!(config.log_level, "info");
+    }
+
+    #[test]
+    fn test_is_important_notification_reason() {
+        let config = Config {
+            important_notification_reasons: vec![
+                "review_requested".to_string(),
+                "mention".to_string(),
+            ],
+            ..Config::default()
+        };
+
+        assert!(config.is_important_notification_reason("review_requested"));
+        assert!(config.is_important_notification_reason("mention"));
+        assert!(!config.is_important_notification_reason("subscribed"));
+        assert!(!config.is_important_notification_reason(""));
+    }
+
+    #[test]
+    fn test_get_persistent_setting_for_notification() {
+        let config = Config {
+            important_notification_reasons: vec![
+                "review_requested".to_string(),
+                "mention".to_string(),
+            ],
+            persistent_important_notifications: true,
+            persistent_notifications: false,
+            ..Config::default()
+        };
+
+        // 重要度が高い場合
+        assert!(config.get_persistent_setting_for_notification("review_requested"));
+        assert!(config.get_persistent_setting_for_notification("mention"));
+
+        // 重要度が低い場合
+        assert!(!config.get_persistent_setting_for_notification("subscribed"));
+        assert!(!config.get_persistent_setting_for_notification("comment"));
+
+        // 重要度が高い場合でも、persistent_important_notificationsがfalseならfalse
+        let non_persistent_config = Config {
+            important_notification_reasons: vec![
+                "review_requested".to_string(),
+                "mention".to_string(),
+            ],
+            persistent_important_notifications: false,
+            persistent_notifications: false,
+            ..Config::default()
+        };
+        assert!(!non_persistent_config.get_persistent_setting_for_notification("review_requested"));
+
+        // 重要度が低い場合はpersistent_notificationsの値が返る
+        let normal_persistent_config = Config {
+            important_notification_reasons: vec![
+                "review_requested".to_string(),
+                "mention".to_string(),
+            ],
+            persistent_important_notifications: false,
+            persistent_notifications: true,
+            ..Config::default()
+        };
+        assert!(normal_persistent_config.get_persistent_setting_for_notification("subscribed"));
+    }
+
+    #[test]
+    fn test_config_deserialization_with_important_notification_settings() {
+        let toml_str = r#"
+            poll_interval_sec = 60
+            mark_as_read_on_notify = true
+            important_notification_reasons = ["review_requested", "mention", "assign"]
+            persistent_important_notifications = true
+        "#;
+        let config: Config = toml::from_str(toml_str).unwrap();
+
+        assert_eq!(config.poll_interval_sec, 60);
+        assert!(config.mark_as_read_on_notify);
+        assert_eq!(
+            config.important_notification_reasons,
+            vec!["review_requested", "mention", "assign"]
+        );
+        assert!(config.persistent_important_notifications);
+    }
+
+    #[test]
+    fn test_config_serialization_with_important_notification_settings() {
+        let config = Config {
+            important_notification_reasons: vec![
+                "review_requested".to_string(),
+                "mention".to_string(),
+            ],
+            persistent_important_notifications: true,
+            ..Config::default()
+        };
+
+        let serialized = toml::to_string_pretty(&config).unwrap();
+        assert!(serialized.contains("review_requested"));
+        assert!(serialized.contains("mention"));
+        assert!(serialized.contains("persistent_important_notifications = true"));
     }
 }

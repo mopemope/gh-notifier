@@ -1,9 +1,10 @@
 ---
 id: task-27
 title: 重要度に応じた設定値を取得するためのヘルパー関数を実装する
-status: To Do
+status: Done
 assignee: []
 created_date: '2025-11-06 22:10'
+updated_date: '2025-11-07 00:09'
 labels:
   - logic
   - enhancement

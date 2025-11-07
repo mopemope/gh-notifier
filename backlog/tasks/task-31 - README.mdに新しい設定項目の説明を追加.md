@@ -1,9 +1,10 @@
 ---
 id: task-31
 title: README.mdに新しい設定項目の説明を追加
-status: To Do
+status: Done
 assignee: []
 created_date: '2025-11-06 22:10'
+updated_date: '2025-11-07 01:39'
 labels:
   - documentation
   - enhancement

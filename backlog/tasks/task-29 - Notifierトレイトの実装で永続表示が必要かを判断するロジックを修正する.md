@@ -1,9 +1,10 @@
 ---
 id: task-29
 title: Notifierトレイトの実装で永続表示が必要かを判断するロジックを修正する
-status: To Do
+status: Done
 assignee: []
 created_date: '2025-11-06 22:10'
+updated_date: '2025-11-07 01:27'
 labels:
   - notifier
   - enhancement

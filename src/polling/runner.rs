@@ -261,6 +261,7 @@ mod tests {
             _title: &str,
             _body: &str,
             _url: &str,
+            _notification_reason: &str,
             _config: &Config,
         ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             Ok(())

@@ -1,9 +1,10 @@
 ---
 id: task-32
 title: 新しい設定項目と重要度判定ロジックに対するユニットテストを追加
-status: To Do
+status: Done
 assignee: []
 created_date: '2025-11-06 22:10'
+updated_date: '2025-11-07 01:48'
 labels:
   - testing
   - enhancement
