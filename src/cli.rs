@@ -39,6 +39,9 @@ pub enum Commands {
 
     /// Show application info
     Info,
+
+    /// Launch TUI for persistent notification viewing
+    Tui,
 }
 
 #[derive(Args, Clone)]
@@ -139,6 +142,7 @@ pub fn handle_command(
         Commands::Delete(args) => handle_delete_command(args, history_manager)?,
         Commands::Filter(args) => handle_filter_command(args, history_manager)?,
         Commands::Info => handle_info_command(history_manager)?,
+        Commands::Tui => handle_tui_command(history_manager)?,
     }
 
     Ok(())
@@ -408,5 +412,14 @@ fn handle_info_command(
         }
     }
 
+    Ok(())
+}
+
+fn handle_tui_command(
+    history_manager: HistoryManager,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    println!("Starting TUI interface for persistent notifications...");
+    let mut app = crate::tui::TuiApp::new(history_manager)?;
+    app.run()?;
     Ok(())
 }

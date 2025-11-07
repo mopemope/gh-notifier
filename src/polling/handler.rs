@@ -19,7 +19,7 @@ pub async fn handle_notification(
         notification.repository.full_name,
         notification.url
     );
-    
+
     // Additional logging for Pull Request notifications to help debug why they might not appear
     if notification.subject.kind == "PullRequest" {
         tracing::info!(

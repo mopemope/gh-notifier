@@ -130,7 +130,7 @@ pub fn filter_new_notifications<'a>(
             }
 
             let result = repo_ok && org_ok && type_ok && reason_ok && content_ok && time_ok && draft_ok;
-            
+
             if result {
                 tracing::debug!(
                     "Notification passed all filters: {} - {} (type: {}, reason: {}, ID: {})",
@@ -141,7 +141,7 @@ pub fn filter_new_notifications<'a>(
                     n.id
                 );
             }
-            
+
             result
         })
         .collect();

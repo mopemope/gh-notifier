@@ -26,6 +26,8 @@ rusqlite = { version = "0.31", features = ["bundled"] }
 actix-web = "4.0"
 actix-cors = "0.6"
 clap = { version = "4.0", features = ["derive"] }
+ratatui = "0.28"
+crossterm = "0.28"
 
 [dev-dependencies]
 tempfile = "3.0"

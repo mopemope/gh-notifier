@@ -20,7 +20,9 @@ pub fn filter_by_draft_status(notification: &Notification, config: &Config) -> b
             );
             return false;
         }
-    } else if config.notification_filters.exclude_draft_prs && notification.subject.kind != "PullRequest" {
+    } else if config.notification_filters.exclude_draft_prs
+        && notification.subject.kind != "PullRequest"
+    {
         // Log that this filter doesn't apply to non-PR notifications
         tracing::trace!(
             "Draft filter skipped for non-PR notification (type: {}, ID: {})",

@@ -37,18 +37,24 @@ pub async fn run_polling_loop(
                     "Received {} total notifications from GitHub API",
                     notifications.len()
                 );
-                
+
                 // Count and log PR notifications specifically
-                let pr_count = notifications.iter().filter(|n| n.subject.kind == "PullRequest").count();
+                let pr_count = notifications
+                    .iter()
+                    .filter(|n| n.subject.kind == "PullRequest")
+                    .count();
                 tracing::debug!(
                     "Received {} PR notifications out of {} total from GitHub API",
                     pr_count,
                     notifications.len()
                 );
-                
+
                 // Log details about PR notifications for debugging if there are any
                 if pr_count > 0 {
-                    for notification in notifications.iter().filter(|n| n.subject.kind == "PullRequest") {
+                    for notification in notifications
+                        .iter()
+                        .filter(|n| n.subject.kind == "PullRequest")
+                    {
                         tracing::info!(
                             "GitHub API PR notification received - ID: {}, Title: '{}', Reason: '{}', Repo: '{}'",
                             notification.id,
@@ -67,7 +73,7 @@ pub async fn run_polling_loop(
                     config.notification_filters.exclude_reasons,
                     config.notification_filters.exclude_subject_types
                 );
-                
+
                 let new_notifications = crate::polling::filter::filter_new_notifications(
                     &notifications,
                     state_manager,
@@ -75,7 +81,10 @@ pub async fn run_polling_loop(
                 );
 
                 // Count PR notifications specifically to help debug issues
-                let pr_count = new_notifications.iter().filter(|n| n.subject.kind == "PullRequest").count();
+                let pr_count = new_notifications
+                    .iter()
+                    .filter(|n| n.subject.kind == "PullRequest")
+                    .count();
                 tracing::debug!(
                     "After filtering, {} notifications will be processed ({} PRs)",
                     new_notifications.len(),
@@ -210,7 +219,7 @@ pub async fn run_polling_loop_with_shutdown(
                             "Received {} total notifications from GitHub API (with shutdown)",
                             notifications.len()
                         );
-                        
+
                         // Count and log PR notifications specifically
                         let pr_count = notifications.iter().filter(|n| n.subject.kind == "PullRequest").count();
                         tracing::debug!(
@@ -218,7 +227,7 @@ pub async fn run_polling_loop_with_shutdown(
                             pr_count,
                             notifications.len()
                         );
-                        
+
                         // Log details about PR notifications for debugging if there are any
                         if pr_count > 0 {
                             for notification in notifications.iter().filter(|n| n.subject.kind == "PullRequest") {
@@ -240,7 +249,7 @@ pub async fn run_polling_loop_with_shutdown(
                             config.notification_filters.exclude_reasons,
                             config.notification_filters.exclude_subject_types
                         );
-                        
+
                         let new_notifications = crate::polling::filter::filter_new_notifications(
                             &notifications,
                             state_manager,
@@ -286,7 +295,7 @@ pub async fn run_polling_loop_with_shutdown(
                                     new_notifications.len(),
                                     pr_count
                                 );
-                                
+
                                 for notification in new_notifications {
                                     // Additional logging for PR notifications to help debug
                                     if notification.subject.kind == "PullRequest" {

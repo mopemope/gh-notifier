@@ -19,6 +19,7 @@ pub mod state;
 pub mod storage;
 pub mod token_storage;
 pub mod traits;
+pub mod tui;
 
 pub use app::Application;
 pub use auth::AuthManager;
