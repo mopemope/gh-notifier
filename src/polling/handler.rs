@@ -11,13 +11,26 @@ pub async fn handle_notification(
     history_manager: &HistoryManager,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     tracing::debug!(
-        "Handling notification ID: {}, Title: '{}', Reason: '{}', Type: '{}', Repo: '{}'",
+        "Handling notification ID: {}, Title: '{}', Reason: '{}', Type: '{}', Repo: '{}', URL: '{}'",
         notification.id,
         notification.subject.title,
         notification.reason,
         notification.subject.kind,
-        notification.repository.full_name
+        notification.repository.full_name,
+        notification.url
     );
+    
+    // Additional logging for Pull Request notifications to help debug why they might not appear
+    if notification.subject.kind == "PullRequest" {
+        tracing::info!(
+            "Processing PR notification - ID: {}, Title: '{}', Reason: '{}', Repo: '{}', URL: {}",
+            notification.id,
+            notification.subject.title,
+            notification.reason,
+            notification.repository.full_name,
+            notification.url
+        );
+    }
 
     // 通知が既に保存されていて既読状態になっているか確認
     let is_already_read = history_manager

@@ -9,6 +9,12 @@ pub fn filter_by_reason(notification: &Notification, config: &Config) -> bool {
             .include_reasons
             .contains(&notification.reason)
     {
+        tracing::debug!(
+            "Excluding notification reason (not in include list): '{}' for notification '{}' (ID: {})",
+            notification.reason,
+            notification.subject.title,
+            notification.id
+        );
         return false;
     }
 
@@ -17,6 +23,12 @@ pub fn filter_by_reason(notification: &Notification, config: &Config) -> bool {
         .exclude_reasons
         .contains(&notification.reason)
     {
+        tracing::debug!(
+            "Excluding notification reason (in exclude list): '{}' for notification '{}' (ID: {})",
+            notification.reason,
+            notification.subject.title,
+            notification.id
+        );
         return false;
     }
 

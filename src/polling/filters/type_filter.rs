@@ -9,6 +9,12 @@ pub fn filter_by_subject_type(notification: &Notification, config: &Config) -> b
             .include_subject_types
             .contains(&notification.subject.kind)
     {
+        tracing::debug!(
+            "Excluding notification type (not in include list): '{}' for notification '{}' (ID: {})",
+            notification.subject.kind,
+            notification.subject.title,
+            notification.id
+        );
         return false;
     }
 
@@ -17,6 +23,12 @@ pub fn filter_by_subject_type(notification: &Notification, config: &Config) -> b
         .exclude_subject_types
         .contains(&notification.subject.kind)
     {
+        tracing::debug!(
+            "Excluding notification type (in exclude list): '{}' for notification '{}' (ID: {})",
+            notification.subject.kind,
+            notification.subject.title,
+            notification.id
+        );
         return false;
     }
 

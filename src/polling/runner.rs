@@ -37,17 +37,49 @@ pub async fn run_polling_loop(
                     "Received {} total notifications from GitHub API",
                     notifications.len()
                 );
+                
+                // Count and log PR notifications specifically
+                let pr_count = notifications.iter().filter(|n| n.subject.kind == "PullRequest").count();
+                tracing::debug!(
+                    "Received {} PR notifications out of {} total from GitHub API",
+                    pr_count,
+                    notifications.len()
+                );
+                
+                // Log details about PR notifications for debugging if there are any
+                if pr_count > 0 {
+                    for notification in notifications.iter().filter(|n| n.subject.kind == "PullRequest") {
+                        tracing::info!(
+                            "GitHub API PR notification received - ID: {}, Title: '{}', Reason: '{}', Repo: '{}'",
+                            notification.id,
+                            notification.subject.title,
+                            notification.reason,
+                            notification.repository.full_name
+                        );
+                    }
+                }
 
                 // 最終確認日時以降の新しい通知のみを処理
+                tracing::debug!(
+                    "Applying filters with config settings - include_reasons: {:?}, include_subject_types: {:?}, exclude_reasons: {:?}, exclude_subject_types: {:?}",
+                    config.notification_filters.include_reasons,
+                    config.notification_filters.include_subject_types,
+                    config.notification_filters.exclude_reasons,
+                    config.notification_filters.exclude_subject_types
+                );
+                
                 let new_notifications = crate::polling::filter::filter_new_notifications(
                     &notifications,
                     state_manager,
                     config,
                 );
 
+                // Count PR notifications specifically to help debug issues
+                let pr_count = new_notifications.iter().filter(|n| n.subject.kind == "PullRequest").count();
                 tracing::debug!(
-                    "After filtering, {} notifications will be processed",
-                    new_notifications.len()
+                    "After filtering, {} notifications will be processed ({} PRs)",
+                    new_notifications.len(),
+                    pr_count
                 );
 
                 if !new_notifications.is_empty() {
@@ -85,8 +117,9 @@ pub async fn run_polling_loop(
                     } else {
                         // バッチ処理が無効な場合は1つずつ処理
                         tracing::debug!(
-                            "Processing {} notifications individually",
-                            new_notifications.len()
+                            "Processing {} notifications individually ({} PRs)",
+                            new_notifications.len(),
+                            pr_count
                         );
                         for notification in new_notifications {
                             tracing::debug!(
@@ -96,6 +129,17 @@ pub async fn run_polling_loop(
                                 notification.reason,
                                 notification.subject.kind
                             );
+
+                            // Additional logging for PR notifications to help debug
+                            if notification.subject.kind == "PullRequest" {
+                                tracing::info!(
+                                    "Processing PR notification: {} - {} (reason: {}, ID: {})",
+                                    notification.repository.full_name,
+                                    notification.subject.title,
+                                    notification.reason,
+                                    notification.id
+                                );
+                            }
 
                             // 通知を Notifier に渡す
                             if let Err(e) = crate::polling::handler::handle_notification(
@@ -162,7 +206,41 @@ pub async fn run_polling_loop_with_shutdown(
                     .await
                 {
                     Ok(Some(notifications)) => {
+                        tracing::debug!(
+                            "Received {} total notifications from GitHub API (with shutdown)",
+                            notifications.len()
+                        );
+                        
+                        // Count and log PR notifications specifically
+                        let pr_count = notifications.iter().filter(|n| n.subject.kind == "PullRequest").count();
+                        tracing::debug!(
+                            "Received {} PR notifications out of {} total from GitHub API (with shutdown)",
+                            pr_count,
+                            notifications.len()
+                        );
+                        
+                        // Log details about PR notifications for debugging if there are any
+                        if pr_count > 0 {
+                            for notification in notifications.iter().filter(|n| n.subject.kind == "PullRequest") {
+                                tracing::info!(
+                                    "GitHub API PR notification received (with shutdown) - ID: {}, Title: '{}', Reason: '{}', Repo: '{}'",
+                                    notification.id,
+                                    notification.subject.title,
+                                    notification.reason,
+                                    notification.repository.full_name
+                                );
+                            }
+                        }
+
                         // 最終確認日時以降の新しい通知のみを処理
+                        tracing::debug!(
+                            "Applying filters with config settings (with shutdown) - include_reasons: {:?}, include_subject_types: {:?}, exclude_reasons: {:?}, exclude_subject_types: {:?}",
+                            config.notification_filters.include_reasons,
+                            config.notification_filters.include_subject_types,
+                            config.notification_filters.exclude_reasons,
+                            config.notification_filters.exclude_subject_types
+                        );
+                        
                         let new_notifications = crate::polling::filter::filter_new_notifications(
                             &notifications,
                             state_manager,
@@ -202,7 +280,25 @@ pub async fn run_polling_loop_with_shutdown(
                                 }
                             } else {
                                 // バッチ処理が無効な場合は1つずつ処理
+                                let pr_count = new_notifications.iter().filter(|n| n.subject.kind == "PullRequest").count();
+                                tracing::debug!(
+                                    "Processing {} notifications individually ({} PRs) (with shutdown)",
+                                    new_notifications.len(),
+                                    pr_count
+                                );
+                                
                                 for notification in new_notifications {
+                                    // Additional logging for PR notifications to help debug
+                                    if notification.subject.kind == "PullRequest" {
+                                        tracing::info!(
+                                            "Processing PR notification (with shutdown): {} - {} (reason: {}, ID: {})",
+                                            notification.repository.full_name,
+                                            notification.subject.title,
+                                            notification.reason,
+                                            notification.id
+                                        );
+                                    }
+
                                     // 通知を Notifier に渡す
                                     if let Err(e) = crate::polling::handler::handle_notification(
                                         notification,

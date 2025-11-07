@@ -96,10 +96,17 @@ impl Notifier for DesktopNotifier {
             url.to_string(),
         ));
 
-        notification
-            .show()
-            .map_err(|e| Box::new(std::io::Error::other(e)))?;
-        Ok(())
+        tracing::debug!("Sending desktop notification: title='{}', body='{}', url='{}'", title, body, url);
+        match notification.show() {
+            Ok(_) => {
+                tracing::info!("Desktop notification sent successfully: {}", title);
+                Ok(())
+            },
+            Err(e) => {
+                tracing::error!("Failed to send desktop notification: {}", e);
+                Err(Box::new(std::io::Error::other(e)))
+            }
+        }
     }
 }
 

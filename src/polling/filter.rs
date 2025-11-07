@@ -44,14 +44,25 @@ pub fn filter_new_notifications<'a>(
                 return false;
             }
 
+            tracing::trace!(
+                "Processing notification ID: {}, Title: '{}', Type: '{}', Reason: '{}', Repo: {} (private: {})",
+                n.id,
+                n.subject.title,
+                n.subject.kind,
+                n.reason,
+                n.repository.full_name,
+                n.repository.private
+            );
+
             // 各フィルタを順に適用 (短絡評価により、いずれかがfalseなら以降は評価されない)
             let repo_ok =
                 crate::polling::filters::repository_filter::filter_by_repository(n, config);
             if !repo_ok {
                 tracing::debug!(
-                    "Excluding notification by repository filter: {} - {}",
+                    "Excluding notification by repository filter: {} - {} (ID: {})",
                     n.repository.full_name,
-                    n.subject.title
+                    n.subject.title,
+                    n.id
                 );
             }
 
@@ -59,60 +70,79 @@ pub fn filter_new_notifications<'a>(
                 crate::polling::filters::organization_filter::filter_by_organization(n, config);
             if !org_ok {
                 tracing::debug!(
-                    "Excluding notification by organization filter: {} - {}",
+                    "Excluding notification by organization filter: {} - {} (ID: {})",
                     n.repository.full_name,
-                    n.subject.title
+                    n.subject.title,
+                    n.id
                 );
             }
 
             let type_ok = crate::polling::filters::type_filter::filter_by_subject_type(n, config);
             if !type_ok {
                 tracing::debug!(
-                    "Excluding notification by type filter: {} (reason: {}) - {}",
+                    "Excluding notification by type filter: {} (reason: {}) - {} (ID: {})",
                     n.subject.kind,
                     n.reason,
-                    n.subject.title
+                    n.subject.title,
+                    n.id
                 );
             }
 
             let reason_ok = crate::polling::filters::reason_filter::filter_by_reason(n, config);
             if !reason_ok {
                 tracing::debug!(
-                    "Excluding notification by reason filter: {} (reason: {}) - {}",
+                    "Excluding notification by reason filter: {} (reason: {}) - {} (ID: {})",
                     n.subject.kind,
                     n.reason,
-                    n.subject.title
+                    n.subject.title,
+                    n.id
                 );
             }
 
             let content_ok = crate::polling::filters::content_filter::filter_by_content(n, config);
             if !content_ok {
                 tracing::debug!(
-                    "Excluding notification by content filter: {} - {}",
+                    "Excluding notification by content filter: {} - {} (ID: {})",
                     n.repository.full_name,
-                    n.subject.title
+                    n.subject.title,
+                    n.id
                 );
             }
 
             let time_ok = crate::polling::filters::time_filter::filter_by_time(n, config);
             if !time_ok {
                 tracing::debug!(
-                    "Excluding notification by time filter: {} - {}",
+                    "Excluding notification by time filter: {} - {} (ID: {})",
                     n.repository.full_name,
-                    n.subject.title
+                    n.subject.title,
+                    n.id
                 );
             }
 
             let draft_ok = crate::polling::filters::draft_filter::filter_by_draft_status(n, config);
             if !draft_ok {
                 tracing::debug!(
-                    "Excluding notification by draft filter: {} - {}",
+                    "Excluding notification by draft filter: {} - {} (ID: {})",
                     n.repository.full_name,
-                    n.subject.title
+                    n.subject.title,
+                    n.id
                 );
             }
 
-            repo_ok && org_ok && type_ok && reason_ok && content_ok && time_ok && draft_ok
+            let result = repo_ok && org_ok && type_ok && reason_ok && content_ok && time_ok && draft_ok;
+            
+            if result {
+                tracing::debug!(
+                    "Notification passed all filters: {} - {} (type: {}, reason: {}, ID: {})",
+                    n.repository.full_name,
+                    n.subject.title,
+                    n.subject.kind,
+                    n.reason,
+                    n.id
+                );
+            }
+            
+            result
         })
         .collect();
 
