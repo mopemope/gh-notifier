@@ -10,6 +10,15 @@ pub async fn handle_notification(
     config: &Config,
     history_manager: &HistoryManager,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    tracing::debug!(
+        "Handling notification ID: {}, Title: '{}', Reason: '{}', Type: '{}', Repo: '{}'",
+        notification.id,
+        notification.subject.title,
+        notification.reason,
+        notification.subject.kind,
+        notification.repository.full_name
+    );
+
     // 通知が既に保存されていて既読状態になっているか確認
     let is_already_read = history_manager
         .is_notification_read(&notification.id)
@@ -60,6 +69,7 @@ pub async fn handle_notification(
         url
     );
 
+    tracing::debug!("Sending notification: Title='{}', Body='{}'", title, body);
     notifier.send_notification(&title, &body, url, &notification.reason, config)?;
 
     // 通知を履歴に保存（重複チェック付き）

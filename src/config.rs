@@ -253,9 +253,17 @@ impl Config {
 
 impl Default for Config {
     fn default() -> Self {
-        // デフォルトでは自分宛てのPRレビュー依頼の通知のみを表示
+        // デフォルトではPull Requestの通知を表示（レビュー依頼、メンション、アサイン、作成など）
         let notification_filters = NotificationFilter {
-            include_reasons: vec!["review_requested".to_string()],
+            include_reasons: vec![
+                "review_requested".to_string(), // Review requested
+                "mention".to_string(),          // Mentioned
+                "assign".to_string(),           // Assigned
+                "author".to_string(),           // Authored by user
+                "comment".to_string(),          // Commented on
+                "subscribed".to_string(),       // Watching repository
+                "state_change".to_string(),     // State changed
+            ],
             include_subject_types: vec!["PullRequest".to_string()],
             ..Default::default()
         };
@@ -270,7 +278,10 @@ impl Default for Config {
             log_level: default_log_level(),
             log_file_path: None,
             persistent_notifications: default_persistent_notifications(),
-            important_notification_reasons: Vec::new(), // デフォルトは空のリスト
+            important_notification_reasons: vec![
+                "review_requested".to_string(),
+                "mention".to_string(),
+            ], // Default important reasons
             persistent_important_notifications: default_persistent_important_notifications(),
             api_enabled: default_api_enabled(),
             api_port: default_api_port(),

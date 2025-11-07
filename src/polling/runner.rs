@@ -33,6 +33,11 @@ pub async fn run_polling_loop(
             .await
         {
             Ok(Some(notifications)) => {
+                tracing::debug!(
+                    "Received {} total notifications from GitHub API",
+                    notifications.len()
+                );
+
                 // 最終確認日時以降の新しい通知のみを処理
                 let new_notifications = crate::polling::filter::filter_new_notifications(
                     &notifications,
@@ -40,9 +45,15 @@ pub async fn run_polling_loop(
                     config,
                 );
 
+                tracing::debug!(
+                    "After filtering, {} notifications will be processed",
+                    new_notifications.len()
+                );
+
                 if !new_notifications.is_empty() {
                     // 最新の通知の updated_at を最終確認日時として更新
                     if let Some(latest) = new_notifications.iter().max_by_key(|n| &n.updated_at) {
+                        tracing::debug!("Updating last checked time to: {}", latest.updated_at);
                         state_manager.update_last_checked_at(latest.updated_at.clone());
                     }
 
@@ -73,7 +84,19 @@ pub async fn run_polling_loop(
                         }
                     } else {
                         // バッチ処理が無効な場合は1つずつ処理
+                        tracing::debug!(
+                            "Processing {} notifications individually",
+                            new_notifications.len()
+                        );
                         for notification in new_notifications {
+                            tracing::debug!(
+                                "Processing notification: {} - {} (reason: {}, type: {})",
+                                notification.id,
+                                notification.subject.title,
+                                notification.reason,
+                                notification.subject.kind
+                            );
+
                             // 通知を Notifier に渡す
                             if let Err(e) = crate::polling::handler::handle_notification(
                                 notification,
@@ -93,6 +116,8 @@ pub async fn run_polling_loop(
                     if let Err(e) = state_manager.save() {
                         tracing::error!("Failed to save state: {}", e);
                     }
+                } else {
+                    tracing::debug!("No new notifications to process after filtering");
                 }
             }
             Ok(None) => {

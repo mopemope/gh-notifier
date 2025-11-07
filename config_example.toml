@@ -52,6 +52,7 @@ exclude_fork_repos = false
 # Type-based filters
 # Only show specific notification subject types (Issue, PullRequest, Commit, Release, etc.)
 # If specified, only notifications of these types will be shown
+# When include_subject_types includes "PullRequest", the include_reasons filters apply to PRs
 include_subject_types = [
   "Issue",
   "PullRequest"
@@ -64,9 +65,15 @@ exclude_subject_types = [
 ]
 
 # Only show notifications with specific reasons (if specified, only these will be shown)
+# These are the default reasons included for Pull Request notifications
 include_reasons = [
-  "mention",
-  "review_requested"
+  "review_requested",    # PR review requests
+  "mention",            # Mentioned in PR
+  "assign",             # Assigned to PR
+  "author",             # Authored PR
+  "comment",            # Commented on PR
+  "subscribed",         # Watching repository PR
+  "state_change"        # State changed in PR
 ]
 
 # Hide notifications with specific reasons

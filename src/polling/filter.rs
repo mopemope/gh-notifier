@@ -6,37 +6,119 @@ pub fn filter_new_notifications<'a>(
     state_manager: &StateManager,
     config: &Config,
 ) -> Vec<&'a Notification> {
-    let filtered_notifications: Vec<&'a Notification> =
+    tracing::debug!("Total notifications received: {}", notifications.len());
+
+    let filtered_by_time: Vec<&'a Notification> =
         if let Some(last_checked) = state_manager.get_last_checked_at() {
-            notifications
+            let before_filter: Vec<&'a Notification> = notifications
                 .iter()
                 .filter(|n| n.updated_at.as_str() > last_checked)
-                .collect()
+                .collect();
+            tracing::debug!(
+                "Notifications after time filter (after {}): {}",
+                last_checked,
+                before_filter.len()
+            );
+            before_filter
         } else {
             // 最終確認日時がない場合はすべて新しいと見なす
+            tracing::debug!(
+                "No last checked time, considering all {} notifications as new",
+                notifications.len()
+            );
             notifications.iter().collect()
         };
 
     // 設定に基づいて通知をフィルタリング
-    filtered_notifications
+    let final_filtered: Vec<&'a Notification> = filtered_by_time
         .into_iter()
         .filter(|n| {
             // Early exit if quick checks fail
             // リポジトリプロパティのフィルタリング - これらのチェックは軽量なので先に行う
             if config.notification_filters.exclude_private_repos && n.repository.private {
+                tracing::debug!(
+                    "Excluding notification from private repo: {} - {}",
+                    n.repository.full_name,
+                    n.subject.title
+                );
                 return false;
             }
 
             // 各フィルタを順に適用 (短絡評価により、いずれかがfalseなら以降は評価されない)
-            crate::polling::filters::repository_filter::filter_by_repository(n, config)
-                && crate::polling::filters::organization_filter::filter_by_organization(n, config)
-                && crate::polling::filters::type_filter::filter_by_subject_type(n, config)
-                && crate::polling::filters::reason_filter::filter_by_reason(n, config)
-                && crate::polling::filters::content_filter::filter_by_content(n, config)
-                && crate::polling::filters::time_filter::filter_by_time(n, config)
-                && crate::polling::filters::draft_filter::filter_by_draft_status(n, config)
+            let repo_ok =
+                crate::polling::filters::repository_filter::filter_by_repository(n, config);
+            if !repo_ok {
+                tracing::debug!(
+                    "Excluding notification by repository filter: {} - {}",
+                    n.repository.full_name,
+                    n.subject.title
+                );
+            }
+
+            let org_ok =
+                crate::polling::filters::organization_filter::filter_by_organization(n, config);
+            if !org_ok {
+                tracing::debug!(
+                    "Excluding notification by organization filter: {} - {}",
+                    n.repository.full_name,
+                    n.subject.title
+                );
+            }
+
+            let type_ok = crate::polling::filters::type_filter::filter_by_subject_type(n, config);
+            if !type_ok {
+                tracing::debug!(
+                    "Excluding notification by type filter: {} (reason: {}) - {}",
+                    n.subject.kind,
+                    n.reason,
+                    n.subject.title
+                );
+            }
+
+            let reason_ok = crate::polling::filters::reason_filter::filter_by_reason(n, config);
+            if !reason_ok {
+                tracing::debug!(
+                    "Excluding notification by reason filter: {} (reason: {}) - {}",
+                    n.subject.kind,
+                    n.reason,
+                    n.subject.title
+                );
+            }
+
+            let content_ok = crate::polling::filters::content_filter::filter_by_content(n, config);
+            if !content_ok {
+                tracing::debug!(
+                    "Excluding notification by content filter: {} - {}",
+                    n.repository.full_name,
+                    n.subject.title
+                );
+            }
+
+            let time_ok = crate::polling::filters::time_filter::filter_by_time(n, config);
+            if !time_ok {
+                tracing::debug!(
+                    "Excluding notification by time filter: {} - {}",
+                    n.repository.full_name,
+                    n.subject.title
+                );
+            }
+
+            let draft_ok = crate::polling::filters::draft_filter::filter_by_draft_status(n, config);
+            if !draft_ok {
+                tracing::debug!(
+                    "Excluding notification by draft filter: {} - {}",
+                    n.repository.full_name,
+                    n.subject.title
+                );
+            }
+
+            repo_ok && org_ok && type_ok && reason_ok && content_ok && time_ok && draft_ok
         })
-        .collect()
+        .collect();
+
+    tracing::debug!("Final filtered notifications: {}", final_filtered.len());
+
+    final_filtered
 }
 
 #[cfg(test)]
