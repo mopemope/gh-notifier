@@ -101,8 +101,10 @@ mod tests {
         state_manager.update_last_checked_at(old_time.to_string());
 
         // Use a config with no filters to allow all notifications
-        let mut config = Config::default();
-        config.notification_filters = NotificationFilter::default();
+        let config = Config {
+            notification_filters: NotificationFilter::default(),
+            ..Default::default()
+        };
         let new_notifications = filter_new_notifications(&notifications, &state_manager, &config);
 
         assert_eq!(new_notifications.len(), 1);
@@ -164,9 +166,11 @@ mod tests {
         let mut state_manager = StateManager::new().unwrap();
         state_manager.update_last_checked_at(old_time.to_string());
 
-        let mut config = Config::default();
+        let mut config = Config {
+            notification_filters: NotificationFilter::default(),
+            ..Default::default()
+        };
         // Reset notification filters to allow the test to work as expected
-        config.notification_filters = NotificationFilter::default();
         config
             .notification_filters
             .exclude_reasons
@@ -232,9 +236,11 @@ mod tests {
         let mut state_manager = StateManager::new().unwrap();
         state_manager.update_last_checked_at("2023-01-01T00:00:00Z".to_string());
 
-        let mut config = Config::default();
+        let mut config = Config {
+            notification_filters: NotificationFilter::default(),
+            ..Default::default()
+        };
         // Reset notification filters to allow the test to work as expected
-        config.notification_filters = NotificationFilter::default();
         config
             .notification_filters
             .include_repositories
@@ -300,9 +306,11 @@ mod tests {
         let mut state_manager = StateManager::new().unwrap();
         state_manager.update_last_checked_at("2023-01-01T00:00:00Z".to_string());
 
-        let mut config = Config::default();
+        let mut config = Config {
+            notification_filters: NotificationFilter::default(),
+            ..Default::default()
+        };
         // Reset notification filters to allow the test to work as expected
-        config.notification_filters = NotificationFilter::default();
         config.notification_filters.exclude_private_repos = true;
 
         let new_notifications = filter_new_notifications(&notifications, &state_manager, &config);
@@ -365,9 +373,11 @@ mod tests {
         let mut state_manager = StateManager::new().unwrap();
         state_manager.update_last_checked_at("2023-01-01T00:00:00Z".to_string());
 
-        let mut config = Config::default();
+        let mut config = Config {
+            notification_filters: NotificationFilter::default(),
+            ..Default::default()
+        };
         // Reset notification filters to allow the test to work as expected
-        config.notification_filters = NotificationFilter::default();
         config
             .notification_filters
             .title_contains
@@ -471,9 +481,10 @@ mod tests {
         let mut state_manager = StateManager::new().unwrap();
         state_manager.update_last_checked_at("2023-01-01T00:00:00Z".to_string());
 
-        let mut config = Config::default();
-        // Reset notification filters to allow the test to work as expected
-        config.notification_filters = NotificationFilter::default();
+        let mut config = Config {
+            notification_filters: NotificationFilter::default(),
+            ..Default::default()
+        };
         // Clear include filters so all notifications are considered
         config.notification_filters.include_reasons = vec![];
         config.notification_filters.include_subject_types = vec![];
@@ -542,9 +553,10 @@ mod tests {
         let mut state_manager = StateManager::new().unwrap();
         state_manager.update_last_checked_at("2023-01-01T00:00:00Z".to_string());
 
-        let mut config = Config::default();
-        // Reset notification filters to allow the test to work as expected
-        config.notification_filters = NotificationFilter::default();
+        let mut config = Config {
+            notification_filters: NotificationFilter::default(),
+            ..Default::default()
+        };
         // Clear include filters so all notifications are considered
         config.notification_filters.include_reasons = vec![];
         config.notification_filters.include_subject_types = vec![];
@@ -613,9 +625,10 @@ mod tests {
         let mut state_manager = StateManager::new().unwrap();
         state_manager.update_last_checked_at("2023-01-01T00:00:00Z".to_string());
 
-        let mut config = Config::default();
-        // Reset notification filters to allow the test to work as expected
-        config.notification_filters = NotificationFilter::default();
+        let mut config = Config {
+            notification_filters: NotificationFilter::default(),
+            ..Default::default()
+        };
         // Clear include filters so all notifications are considered
         config.notification_filters.include_reasons = vec![];
         config.notification_filters.include_subject_types = vec![];
@@ -684,9 +697,10 @@ mod tests {
         let mut state_manager = StateManager::new().unwrap();
         state_manager.update_last_checked_at("2023-01-01T00:00:00Z".to_string());
 
-        let mut config = Config::default();
-        // Reset notification filters to allow the test to work as expected
-        config.notification_filters = NotificationFilter::default();
+        let mut config = Config {
+            notification_filters: NotificationFilter::default(),
+            ..Default::default()
+        };
         // Clear include filters so all notifications are considered
         config.notification_filters.include_reasons = vec![];
         config.notification_filters.include_subject_types = vec![];
@@ -755,9 +769,10 @@ mod tests {
         let mut state_manager = StateManager::new().unwrap();
         state_manager.update_last_checked_at("2023-01-01T00:00:00Z".to_string());
 
-        let mut config = Config::default();
-        // Reset notification filters to allow the test to work as expected
-        config.notification_filters = NotificationFilter::default();
+        let mut config = Config {
+            notification_filters: NotificationFilter::default(),
+            ..Default::default()
+        };
         // Clear include filters so all notifications are considered
         config.notification_filters.include_reasons = vec![];
         config.notification_filters.include_subject_types = vec![];
@@ -848,9 +863,10 @@ mod tests {
         let mut state_manager = StateManager::new().unwrap();
         state_manager.update_last_checked_at("2023-01-01T00:00:00Z".to_string());
 
-        let mut config = Config::default();
-        // Reset notification filters to allow the test to work as expected
-        config.notification_filters = NotificationFilter::default();
+        let mut config = Config {
+            notification_filters: NotificationFilter::default(),
+            ..Default::default()
+        };
         // For this test, we want to set specific include filters to test combination
         config.notification_filters.include_reasons = vec!["review_requested".to_string()];
         config.notification_filters.include_subject_types = vec!["PullRequest".to_string()];
@@ -938,9 +954,10 @@ mod tests {
         let mut state_manager = StateManager::new().unwrap();
         state_manager.update_last_checked_at("2023-01-01T00:00:00Z".to_string());
 
-        let mut config = Config::default();
-        // Reset notification filters to allow the test to work as expected
-        config.notification_filters = NotificationFilter::default();
+        let mut config = Config {
+            notification_filters: NotificationFilter::default(),
+            ..Default::default()
+        };
         // Clear include filters so all notification types are considered
         config.notification_filters.include_reasons = vec![];
         config.notification_filters.include_subject_types = vec![];

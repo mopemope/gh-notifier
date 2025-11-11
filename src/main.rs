@@ -13,10 +13,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             // Run the default application as before
             Application::run().await
         }
-        Some(command) => {
-            // Handle CLI commands
+        Some(Commands::Tui) => {
+            // Handle the TUI command
             let db_path = get_database_path();
-
+            let history_manager = gh_notifier::HistoryManager::new(&db_path)?;
+            gh_notifier::cli::handle_command(cli.command.clone().unwrap(), history_manager)?;
+            Ok(())
+        }
+        Some(command) => {
+            // Handle other CLI commands
+            let db_path = get_database_path();
             let history_manager = gh_notifier::HistoryManager::new(&db_path)?;
             gh_notifier::cli::handle_command(command.clone(), history_manager)?;
             Ok(()) // Return Ok explicitly after CLI command handling

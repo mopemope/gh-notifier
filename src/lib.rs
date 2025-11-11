@@ -19,6 +19,7 @@ pub mod state;
 pub mod storage;
 pub mod token_storage;
 pub mod traits;
+pub mod tui;
 
 pub use app::Application;
 pub use auth::AuthManager;
@@ -39,3 +40,4 @@ pub use traits::{
     ConfigProvider, DefaultConfigProvider, DefaultExitHandler, DefaultMessageHandler, ExitHandler,
     MessageHandler,
 };
+pub use tui::{AppState, TuiApp};

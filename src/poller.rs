@@ -229,9 +229,11 @@ mod tests {
     #[test]
     fn test_filter_new_notifications() {
         use crate::config::NotificationFilter;
-        let mut config = Config::default();
+        let config = Config {
+            notification_filters: NotificationFilter::default(),
+            ..Default::default()
+        };
         // Reset notification filters to allow the test to work as expected
-        config.notification_filters = NotificationFilter::default();
         let auth_manager = AuthManager::new().unwrap();
         let github_client = GitHubClient::new(auth_manager).unwrap();
         let state_manager = StateManager::new().unwrap();

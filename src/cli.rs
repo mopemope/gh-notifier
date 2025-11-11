@@ -39,6 +39,9 @@ pub enum Commands {
 
     /// Show application info
     Info,
+
+    /// Launch the TUI to view and manage notifications
+    Tui,
 }
 
 #[derive(Args, Clone)]
@@ -139,6 +142,7 @@ pub fn handle_command(
         Commands::Delete(args) => handle_delete_command(args, history_manager)?,
         Commands::Filter(args) => handle_filter_command(args, history_manager)?,
         Commands::Info => handle_info_command(history_manager)?,
+        Commands::Tui => handle_tui_command(history_manager)?,
     }
 
     Ok(())
@@ -407,6 +411,20 @@ fn handle_info_command(
             );
         }
     }
+
+    Ok(())
+}
+
+fn handle_tui_command(
+    history_manager: HistoryManager,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    use crate::TuiApp;
+
+    println!("Starting GitHub Notifier TUI...");
+    println!("Press 'q' to quit the interface at any time.");
+
+    let mut app = TuiApp::new(history_manager)?;
+    app.run()?;
 
     Ok(())
 }

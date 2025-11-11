@@ -1,3 +1,6 @@
+#![allow(deprecated)]
+
+use assert_cmd::cargo::CommandCargoExt;
 use assert_cmd::prelude::*;
 use std::process::Command;
 
@@ -12,7 +15,6 @@ fn test_cli_help() {
 fn test_cli_commands_available() {
     let mut cmd = Command::cargo_bin("gh-notifier").unwrap();
     cmd.arg("history");
-    // This might fail because there's no database, but it should recognize the command
     // We're testing that the CLI structure works
     cmd.assert();
 }
