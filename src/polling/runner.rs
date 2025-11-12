@@ -12,6 +12,8 @@ pub async fn run_polling_loop(
     notifier: &dyn Notifier,
     history_manager: &HistoryManager,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    tracing::info!("Starting polling loop without shutdown signal");
+
     let mut interval = interval(StdDuration::from_secs(config.poll_interval_sec));
     // バッチ処理用のバッファとタイマー
     let batch_size = config.notification_batch_config.batch_size;
@@ -24,6 +26,7 @@ pub async fn run_polling_loop(
     loop {
         interval.tick().await; // 次のポーリングまで待機
 
+        tracing::info!("Start fetching notifications");
         // StateManager から最終確認日時を取得
         let if_modified_since = state_manager.get_last_checked_at();
 
@@ -38,6 +41,12 @@ pub async fn run_polling_loop(
                     &notifications,
                     state_manager,
                     config,
+                );
+
+                tracing::info!(
+                    total = notifications.len(),
+                    new = new_notifications.len(),
+                    "Notifications fetched and filtered",
                 );
 
                 if !new_notifications.is_empty() {
@@ -115,6 +124,8 @@ pub async fn run_polling_loop_with_shutdown(
     shutdown_rx: &mut broadcast::Receiver<()>,
     history_manager: &HistoryManager,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    tracing::info!("Starting polling loop with shutdown signal support");
+
     let mut interval = interval(StdDuration::from_secs(config.poll_interval_sec));
     // バッチ処理用のバッファとタイマー
     let batch_size = config.notification_batch_config.batch_size;
@@ -128,6 +139,7 @@ pub async fn run_polling_loop_with_shutdown(
         // シャットダウンシグナルを待機しつつ、ポーリング間隔を待機
         tokio::select! {
             _ = interval.tick() => {
+                tracing::info!("Start fetching notifications");
                 // StateManager から最終確認日時を取得
                 let if_modified_since = state_manager.get_last_checked_at();
 
@@ -142,6 +154,12 @@ pub async fn run_polling_loop_with_shutdown(
                             &notifications,
                             state_manager,
                             config,
+                        );
+
+                        tracing::info!(
+                            total = notifications.len(),
+                            new = new_notifications.len(),
+                            "Notifications fetched and filtered",
                         );
 
                         if !new_notifications.is_empty() {

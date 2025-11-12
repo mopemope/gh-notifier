@@ -60,6 +60,16 @@ pub async fn handle_notification(
         url
     );
 
+    // Log every received notification at info level so that receipt is always visible in logs
+    tracing::info!(
+        notification_id = %notification.id,
+        repository = %notification.repository.full_name,
+        reason = %notification.reason,
+        subject_title = %notification.subject.title,
+        subject_type = %notification.subject.kind,
+        "New GitHub notification received and being processed",
+    );
+
     notifier.send_notification(&title, &body, url, config)?;
 
     // 通知を履歴に保存（重複チェック付き）

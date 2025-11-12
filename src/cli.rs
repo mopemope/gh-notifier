@@ -227,6 +227,9 @@ fn handle_history_command(
         });
     }
 
+    // 新しい通知を優先して表示するため、受信日時の降順でソート
+    filtered_notifications.sort_by(|a, b| b.received_at.cmp(&a.received_at));
+
     // Apply limit
     filtered_notifications.truncate(args.limit);
 
