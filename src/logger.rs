@@ -7,11 +7,11 @@ use crate::config::Config;
 /// Set up application logging based on configuration
 pub fn setup_logging(config: &Config) -> tracing_appender::non_blocking::WorkerGuard {
     // Initialize tracing logger with level from config
-    let log_level = &config.log_level;
+    let log_level = &config.log_level();
     let env_filter =
         EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(log_level));
 
-    if config.log_file_path.is_none() {
+    if config.log_file_path().is_none() {
         // When no file path is specified, log only to stdout/stderr
         let subscriber = FmtSubscriber::builder()
             .with_env_filter(env_filter)
@@ -30,7 +30,7 @@ pub fn setup_logging(config: &Config) -> tracing_appender::non_blocking::WorkerG
         guard
     } else {
         // Use file logging when a file path is specified
-        let (file_writer, guard) = create_file_logger(&config.log_file_path);
+        let (file_writer, guard) = create_file_logger(config.log_file_path());
 
         let subscriber = FmtSubscriber::builder()
             .with_env_filter(env_filter)

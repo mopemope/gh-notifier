@@ -82,7 +82,7 @@ impl Notifier for DesktopNotifier {
             .icon("dialog-information");
 
         // persistent_notifications設定に基づいて通知の永続性を制御
-        if config.persistent_notifications {
+        if config.persistent_notifications() {
             notification.hint(notify_rust::Hint::Transient(false)); // 永続的（自動消去しない）
         } else {
             notification.hint(notify_rust::Hint::Transient(true)); // 一時的（自動消去する）
@@ -139,7 +139,7 @@ impl Notifier for WindowsNotifier {
             .launch(&url);
 
         // persistent_notifications設定に基づいて通知の永続性を制御
-        if config.persistent_notifications {
+        if config.persistent_notifications() {
             // 永続的通知（スリープ状態でも表示）
             toast = toast.duration(winrt_notification::Duration::Long);
         } else {
@@ -166,7 +166,7 @@ impl Notifier for DummyNotifier {
         url: &str,
         config: &Config,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        let persistence_status = if config.persistent_notifications {
+        let persistence_status = if config.persistent_notifications() {
             "persistent"
         } else {
             "transient"
@@ -205,8 +205,9 @@ mod tests {
     async fn test_poller_creation() {
         use tempfile::tempdir;
         let config = Config::default();
-        let auth_manager = AuthManager::new().unwrap();
-        let github_client = GitHubClient::new(auth_manager).unwrap();
+        let _auth_manager = AuthManager::new().unwrap();
+        let github_config = crate::config::GitHubConfig::default();
+        let github_client = GitHubClient::new(github_config).unwrap();
         let state_manager = StateManager::new().unwrap();
         let notifier: Box<dyn Notifier> = Box::new(DummyNotifier);
 
@@ -223,19 +224,25 @@ mod tests {
             history_manager,
         );
         // 構造体が作成できることを確認
-        assert_eq!(poller.config.poll_interval_sec, 30);
+        assert_eq!(poller.config.poll_interval_sec(), 30);
     }
 
     #[test]
     fn test_filter_new_notifications() {
         use crate::config::NotificationFilter;
         let config = Config {
-            notification_filters: NotificationFilter::default(),
+            notification: crate::config::NotificationConfig {
+                mark_as_read_on_notify: false,
+                persistent_notifications: false,
+                batch: Default::default(),
+                filters: NotificationFilter::default(),
+            },
             ..Default::default()
         };
         // Reset notification filters to allow the test to work as expected
-        let auth_manager = AuthManager::new().unwrap();
-        let github_client = GitHubClient::new(auth_manager).unwrap();
+        let _auth_manager = AuthManager::new().unwrap();
+        let github_config = crate::config::GitHubConfig::default();
+        let github_client = GitHubClient::new(github_config).unwrap();
         let state_manager = StateManager::new().unwrap();
         let notifier: Box<dyn Notifier> = Box::new(DummyNotifier);
         // テスト用に一時的なデータベースを作成

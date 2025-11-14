@@ -3,9 +3,12 @@ use crate::{Config, Notification};
 /// Filters notifications based on subject type inclusion/exclusion rules
 pub fn filter_by_subject_type(notification: &Notification, config: &Config) -> bool {
     // 通知タイプのフィルタリング
-    if !config.notification_filters.include_subject_types.is_empty()
+    if !config
+        .notification_filters()
+        .include_subject_types
+        .is_empty()
         && !config
-            .notification_filters
+            .notification_filters()
             .include_subject_types
             .contains(&notification.subject.kind)
     {
@@ -13,7 +16,7 @@ pub fn filter_by_subject_type(notification: &Notification, config: &Config) -> b
     }
 
     if config
-        .notification_filters
+        .notification_filters()
         .exclude_subject_types
         .contains(&notification.subject.kind)
     {

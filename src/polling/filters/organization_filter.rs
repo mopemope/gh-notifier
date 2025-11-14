@@ -5,9 +5,12 @@ use crate::{Config, Notification};
 pub fn filter_by_organization(notification: &Notification, config: &Config) -> bool {
     let org_name = extract_org_name(&notification.repository.full_name);
 
-    if !config.notification_filters.include_organizations.is_empty()
+    if !config
+        .notification_filters()
+        .include_organizations
+        .is_empty()
         && !config
-            .notification_filters
+            .notification_filters()
             .include_organizations
             .contains(&org_name)
     {
@@ -15,7 +18,7 @@ pub fn filter_by_organization(notification: &Notification, config: &Config) -> b
     }
 
     if config
-        .notification_filters
+        .notification_filters()
         .exclude_organizations
         .contains(&org_name)
     {

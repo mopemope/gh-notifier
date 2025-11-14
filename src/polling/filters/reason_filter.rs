@@ -3,9 +3,9 @@ use crate::{Config, Notification};
 /// Filters notifications based on reason inclusion/exclusion rules
 pub fn filter_by_reason(notification: &Notification, config: &Config) -> bool {
     // 通知理由のフィルタリング
-    if !config.notification_filters.include_reasons.is_empty()
+    if !config.notification_filters().include_reasons.is_empty()
         && !config
-            .notification_filters
+            .notification_filters()
             .include_reasons
             .contains(&notification.reason)
     {
@@ -13,7 +13,7 @@ pub fn filter_by_reason(notification: &Notification, config: &Config) -> bool {
     }
 
     if config
-        .notification_filters
+        .notification_filters()
         .exclude_reasons
         .contains(&notification.reason)
     {

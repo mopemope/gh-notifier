@@ -6,7 +6,9 @@ impl super::AuthManager {
     pub async fn get_valid_token(&mut self) -> Result<String, AuthError> {
         // If no token is available, return error
         if self.token_info.is_none() {
-            return Err(AuthError::GeneralError("No token available".to_string()));
+            return Err(AuthError::Generic {
+                reason: "No token available".to_string(),
+            });
         }
 
         // PATs don't expire, so we can return the token directly
@@ -36,9 +38,9 @@ impl super::AuthManager {
             }
             Ok(false) => {
                 // Token is invalid
-                Err(AuthError::GeneralError(
-                    "PAT validation failed. The token may be invalid or have insufficient permissions.".to_string(),
-                ))
+                Err(AuthError::Generic {
+                    reason: "PAT validation failed. The token may be invalid or have insufficient permissions.".to_string(),
+                })
             }
             Err(validation_error) => {
                 // Validation failed due to network or other issues

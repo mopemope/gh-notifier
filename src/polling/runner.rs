@@ -14,12 +14,12 @@ pub async fn run_polling_loop(
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     tracing::info!("Starting polling loop without shutdown signal");
 
-    let mut interval = interval(StdDuration::from_secs(config.poll_interval_sec));
+    let mut interval = interval(StdDuration::from_secs(config.poll_interval_sec()));
     // バッチ処理用のバッファとタイマー
-    let batch_size = config.notification_batch_config.batch_size;
+    let batch_size = config.notification_batch_config().batch_size;
     let batch_interval =
-        StdDuration::from_secs(config.notification_batch_config.batch_interval_sec);
-    let error_handling = &config.polling_error_handling_config;
+        StdDuration::from_secs(config.notification_batch_config().batch_interval_sec);
+    let error_handling = &config.polling_error_handling_config();
     let mut batch_buffer: VecDeque<Notification> = VecDeque::new();
     let mut last_batch_time = Instant::now();
 
@@ -36,9 +36,42 @@ pub async fn run_polling_loop(
             .await
         {
             Ok(Some(notifications)) => {
+                // Convert GitHub Notifications to models::Notification for filtering
+                let models_notifications: Vec<crate::models::Notification> = notifications
+                    .iter()
+                    .map(|n| crate::models::Notification {
+                        id: n.id.clone(),
+                        unread: n.unread,
+                        reason: n.reason.to_string(),
+                        updated_at: n.updated_at.to_rfc3339(),
+                        last_read_at: n.last_read_at.as_ref().map(|t| t.to_rfc3339()),
+                        subject: crate::models::NotificationSubject {
+                            title: n.subject.title.clone(),
+                            url: n.subject.url.clone(),
+                            latest_comment_url: n.subject.latest_comment_url.clone(),
+                            kind: n.subject.subject_type.clone(),
+                        },
+                        repository: crate::models::NotificationRepository {
+                            id: n.repository.id,
+                            node_id: "".to_string(), // GitHub types doesn't have node_id
+                            name: n
+                                .repository
+                                .full_name
+                                .split('/')
+                                .next_back()
+                                .unwrap_or_default()
+                                .to_string(), // Extract repo name from full_name (owner/repo)
+                            full_name: n.repository.full_name.clone(),
+                            private: n.repository.r#private,
+                        },
+                        url: n.url.clone(),
+                        subscription_url: n.html_url.clone().unwrap_or_default(),
+                    })
+                    .collect();
+
                 // 最終確認日時以降の新しい通知のみを処理
                 let new_notifications = crate::polling::filter::filter_new_notifications(
-                    &notifications,
+                    &models_notifications,
                     state_manager,
                     config,
                 );
@@ -126,12 +159,12 @@ pub async fn run_polling_loop_with_shutdown(
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     tracing::info!("Starting polling loop with shutdown signal support");
 
-    let mut interval = interval(StdDuration::from_secs(config.poll_interval_sec));
+    let mut interval = interval(StdDuration::from_secs(config.poll_interval_sec()));
     // バッチ処理用のバッファとタイマー
-    let batch_size = config.notification_batch_config.batch_size;
+    let batch_size = config.notification_batch_config().batch_size;
     let batch_interval =
-        StdDuration::from_secs(config.notification_batch_config.batch_interval_sec);
-    let error_handling = &config.polling_error_handling_config;
+        StdDuration::from_secs(config.notification_batch_config().batch_interval_sec);
+    let error_handling = &config.polling_error_handling_config();
     let mut batch_buffer: VecDeque<Notification> = VecDeque::new();
     let mut last_batch_time = Instant::now();
 
@@ -149,9 +182,36 @@ pub async fn run_polling_loop_with_shutdown(
                     .await
                 {
                     Ok(Some(notifications)) => {
+                        // Convert GitHub Notifications to models::Notification for filtering
+                        let models_notifications: Vec<crate::models::Notification> = notifications
+                            .iter()
+                            .map(|n| crate::models::Notification {
+                                id: n.id.clone(),
+                                unread: n.unread,
+                                reason: n.reason.to_string(),
+                                updated_at: n.updated_at.to_rfc3339(),
+                                last_read_at: n.last_read_at.as_ref().map(|t| t.to_rfc3339()),
+                                subject: crate::models::NotificationSubject {
+                                    title: n.subject.title.clone(),
+                                    url: n.subject.url.clone(),
+                                    latest_comment_url: n.subject.latest_comment_url.clone(),
+                                    kind: n.subject.subject_type.clone(),
+                                },
+                                repository: crate::models::NotificationRepository {
+                                    id: n.repository.id,
+                                    node_id: "".to_string(),  // GitHub types doesn't have node_id
+                                    name: n.repository.full_name.split('/').next_back().unwrap_or_default().to_string(),  // Extract repo name from full_name (owner/repo)
+                                    full_name: n.repository.full_name.clone(),
+                                    private: n.repository.r#private,
+                                },
+                                url: n.url.clone(),
+                                subscription_url: n.html_url.clone().unwrap_or_default(),
+                            })
+                            .collect();
+
                         // 最終確認日時以降の新しい通知のみを処理
                         let new_notifications = crate::polling::filter::filter_new_notifications(
-                            &notifications,
+                            &models_notifications,
                             state_manager,
                             config,
                         );
@@ -289,8 +349,9 @@ mod tests {
     async fn test_run_polling_loop_with_shutdown_immediate() {
         use tempfile::tempdir;
         let config = Config::default();
-        let auth_manager = AuthManager::new().unwrap();
-        let mut github_client = GitHubClient::new(auth_manager).unwrap();
+        let _auth_manager = AuthManager::new().unwrap();
+        let github_config = crate::config::GitHubConfig::default();
+        let mut github_client = GitHubClient::new(github_config).unwrap();
         let mut state_manager = StateManager::new().unwrap();
         let notifier = MockNotifier;
 
@@ -325,8 +386,9 @@ mod tests {
     async fn test_run_polling_loop_with_shutdown_after_creation() {
         use tempfile::tempdir;
         let config = Config::default();
-        let auth_manager = AuthManager::new().unwrap();
-        let mut github_client = GitHubClient::new(auth_manager).unwrap();
+        let _auth_manager = AuthManager::new().unwrap();
+        let github_config = crate::config::GitHubConfig::default();
+        let mut github_client = GitHubClient::new(github_config).unwrap();
         let mut state_manager = StateManager::new().unwrap();
         let notifier = MockNotifier;
 

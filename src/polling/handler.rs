@@ -17,7 +17,7 @@ pub async fn handle_notification(
 
     // 通知が既読なら、表示しない設定があれば通知をスキップする
     // (ただし、通知を表示するかどうかは設定で制御可能)
-    if is_already_read && !config.show_read_notifications {
+    if is_already_read && !config.show_read_notifications() {
         tracing::debug!(
             "Notification {} is already read, skipping notification",
             notification.id
@@ -77,7 +77,7 @@ pub async fn handle_notification(
         tracing::error!("Failed to save notification to history: {}", e);
     }
 
-    if config.mark_as_read_on_notify {
+    if config.mark_as_read_on_notify() {
         github_client
             .mark_notification_as_read(&notification.id)
             .await?;
@@ -170,8 +170,9 @@ mod tests {
     async fn test_handle_notification() {
         use tempfile::tempdir;
         let config = Config::default();
-        let auth_manager = AuthManager::new().unwrap();
-        let mut github_client = GitHubClient::new(auth_manager).unwrap();
+        let _auth_manager = AuthManager::new().unwrap();
+        let github_config = crate::config::GitHubConfig::default();
+        let mut github_client = GitHubClient::new(github_config).unwrap();
         let notification = Notification {
             id: "1".to_string(),
             unread: true,

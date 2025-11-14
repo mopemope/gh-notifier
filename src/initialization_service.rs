@@ -40,7 +40,7 @@ impl<'a> AppInitializationService<'a> {
         let mut auth_manager = AuthManager::new()?;
 
         // Set the PAT from config if available
-        if let Some(pat) = &config.pat {
+        if let Some(pat) = &config.github.token {
             if !pat.trim().is_empty() {
                 use secrecy::SecretString;
                 let token_info = crate::TokenInfo {
@@ -103,7 +103,7 @@ impl<'a> AppInitializationService<'a> {
         }
 
         // Initialize clients and services
-        let github_client = GitHubClient::new(auth_manager).unwrap();
+        let github_client = GitHubClient::new(config.github.clone()).unwrap();
         let state_manager = StateManager::new().unwrap();
         let notifier = Box::new(DesktopNotifier);
 
@@ -119,20 +119,18 @@ impl<'a> AppInitializationService<'a> {
 
             // Create directory if it doesn't exist
             std::fs::create_dir_all(&data_dir).map_err(|e| {
-                crate::errors::AuthError::InitializationError(format!(
-                    "Failed to create data directory: {}",
-                    e
-                ))
+                crate::errors::AuthError::InitializationError {
+                    reason: format!("Failed to create data directory: {}", e),
+                }
             })?;
 
             // Create database file path
             let db_path = data_dir.join("notifications.db");
 
             HistoryManager::new(&db_path).map_err(|e| {
-                crate::errors::AuthError::InitializationError(format!(
-                    "Failed to initialize HistoryManager: {}",
-                    e
-                ))
+                crate::errors::AuthError::InitializationError {
+                    reason: format!("Failed to initialize HistoryManager: {}", e),
+                }
             })?
         };
 

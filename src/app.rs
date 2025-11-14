@@ -85,7 +85,7 @@ async fn perform_notification_recovery(
         .unwrap_or(std::time::Duration::from_secs(0))
         .as_secs();
 
-    let recovery_window_hours = initialized_app.config.notification_recovery_window_hours;
+    let recovery_window_hours = initialized_app.config.notification_recovery_window_hours();
     // If recovery window is 0, don't recover any notifications
     if recovery_window_hours == 0 {
         tracing::info!("Notification recovery window is 0, skipping recovery");
@@ -149,7 +149,7 @@ async fn perform_notification_recovery(
                     tracing::debug!("Recovery notification sent for: {}", notification.title);
 
                     // Optionally mark as read if the config says to do so on recovery
-                    if initialized_app.config.mark_as_read_on_notify {
+                    if initialized_app.config.mark_as_read_on_notify() {
                         let _ = initialized_app
                             .history_manager
                             .mark_as_read(&notification.id)

@@ -20,7 +20,7 @@ pub struct Cli {
     pub command: Option<Commands>,
 }
 
-#[derive(Subcommand, Clone)]
+#[derive(Subcommand, Clone, Debug)]
 pub enum Commands {
     /// Start the notification polling service
     Start,
@@ -44,7 +44,7 @@ pub enum Commands {
     Tui,
 }
 
-#[derive(Args, Clone)]
+#[derive(Args, Clone, Debug)]
 pub struct HistoryArgs {
     /// Show only unread notifications
     #[arg(short, long)]
@@ -83,7 +83,7 @@ pub struct HistoryArgs {
     pub verbose: bool,
 }
 
-#[derive(Args, Clone)]
+#[derive(Args, Clone, Debug)]
 pub struct MarkReadArgs {
     /// Mark all notifications as read
     #[arg(short, long)]
@@ -98,7 +98,7 @@ pub struct MarkReadArgs {
     pub repository: Option<String>,
 }
 
-#[derive(Args, Clone)]
+#[derive(Args, Clone, Debug)]
 pub struct DeleteArgs {
     /// Notification IDs to delete
     #[arg(value_name = "NOTIFICATION_ID")]
@@ -113,7 +113,7 @@ pub struct DeleteArgs {
     pub repository: Option<String>,
 }
 
-#[derive(Args, Clone)]
+#[derive(Args, Clone, Debug)]
 pub struct FilterArgs {
     /// Clear all notifications from history
     #[arg(long)]

@@ -15,9 +15,9 @@ pub async fn run_polling_loop_with_shutdown(
 
     // For now, starting the API server in the same context without spawning
     // This is because Actix-web's HttpServer is not Send and can't be spawned in a task
-    let api_handle = if config.api_enabled {
+    let api_handle = if config.api_enabled() {
         let history_manager_clone = history_manager.clone();
-        let api_port = config.api_port;
+        let api_port = config.api_port();
 
         // Note: The API server is started but will block the current thread
         // In a real-world scenario, you might want to configure this differently

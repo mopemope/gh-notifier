@@ -32,8 +32,8 @@ impl super::AuthManager {
             let client = reqwest::Client::builder()
                 .user_agent(format!("gh-notifier/{}", env!("CARGO_PKG_VERSION")))
                 .build()
-                .map_err(|e| {
-                    AuthError::GeneralError(format!("Failed to create HTTP client: {}", e))
+                .map_err(|e| AuthError::Generic {
+                    reason: format!("Failed to create HTTP client: {}", e),
                 })?;
 
             let response = client
@@ -48,7 +48,9 @@ impl super::AuthManager {
                     tracing::warn!("Token validation request failed: {}", e);
                     // Don't treat network errors as token invalidation
                     // Instead, return the error so the caller can handle it appropriately
-                    AuthError::GeneralError(format!("Network error during token validation: {}", e))
+                    AuthError::Generic {
+                        reason: format!("Network error during token validation: {}", e),
+                    }
                 })?;
 
             let status = response.status();

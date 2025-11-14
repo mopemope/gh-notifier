@@ -6,7 +6,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 /// Filters notifications based on time constraints
 pub fn filter_by_time(notification: &Notification, config: &Config) -> bool {
     // 時間ベースのフィルタリング
-    if let Some(ref min_time_str) = config.notification_filters.minimum_updated_time
+    if let Some(ref min_time_str) = config.notification_filters().minimum_updated_time
         && let Ok(min_duration) = parse_duration(min_time_str)
         && let Ok(updated_time) = parse_iso8601(&notification.updated_at)
     {

@@ -8,12 +8,12 @@ fn test_persistent_notification_config() {
     // Test that the config contains the new option
     let mut config = Config::default();
 
-    // Check default value
-    assert!(!config.persistent_notifications);
+    // Check default value - persistent_notifications is in notification config
+    assert!(!config.notification.persistent_notifications);
 
     // Test with persistent notifications enabled
-    config.persistent_notifications = true;
-    assert!(config.persistent_notifications);
+    config.notification.persistent_notifications = true;
+    assert!(config.notification.persistent_notifications);
 }
 
 #[test]
@@ -28,7 +28,7 @@ fn test_desktop_notifier_uses_persistent_config() {
 
     // Test notification with persistent config
     let mut persistent_config = config;
-    persistent_config.persistent_notifications = true;
+    persistent_config.notification.persistent_notifications = true;
 
     let result = notifier.send_notification(
         "Test Title",

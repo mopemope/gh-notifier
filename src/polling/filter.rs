@@ -2,7 +2,7 @@ use crate::{Config, Notification, StateManager};
 
 /// 指定された最終確認日時以降の通知のみを抽出
 pub fn filter_new_notifications<'a>(
-    notifications: &'a [Notification],
+    notifications: &'a Vec<Notification>,
     state_manager: &StateManager,
     config: &Config,
 ) -> Vec<&'a Notification> {
@@ -23,7 +23,7 @@ pub fn filter_new_notifications<'a>(
         .filter(|n| {
             // Early exit if quick checks fail
             // リポジトリプロパティのフィルタリング - これらのチェックは軽量なので先に行う
-            if config.notification_filters.exclude_private_repos && n.repository.private {
+            if config.notification_filters().exclude_private_repos && n.repository.private {
                 return false;
             }
 
@@ -102,7 +102,10 @@ mod tests {
 
         // Use a config with no filters to allow all notifications
         let config = Config {
-            notification_filters: NotificationFilter::default(),
+            notification: crate::config::NotificationConfig {
+                filters: NotificationFilter::default(),
+                ..Default::default()
+            },
             ..Default::default()
         };
         let new_notifications = filter_new_notifications(&notifications, &state_manager, &config);
@@ -167,12 +170,16 @@ mod tests {
         state_manager.update_last_checked_at(old_time.to_string());
 
         let mut config = Config {
-            notification_filters: NotificationFilter::default(),
+            notification: crate::config::NotificationConfig {
+                filters: NotificationFilter::default(),
+                ..Default::default()
+            },
             ..Default::default()
         };
         // Reset notification filters to allow the test to work as expected
         config
-            .notification_filters
+            .notification
+            .filters
             .exclude_reasons
             .push("comment".to_string());
 
@@ -237,12 +244,16 @@ mod tests {
         state_manager.update_last_checked_at("2023-01-01T00:00:00Z".to_string());
 
         let mut config = Config {
-            notification_filters: NotificationFilter::default(),
+            notification: crate::config::NotificationConfig {
+                filters: NotificationFilter::default(),
+                ..Default::default()
+            },
             ..Default::default()
         };
         // Reset notification filters to allow the test to work as expected
         config
-            .notification_filters
+            .notification
+            .filters
             .include_repositories
             .push("user/repo1".to_string());
 
@@ -307,11 +318,14 @@ mod tests {
         state_manager.update_last_checked_at("2023-01-01T00:00:00Z".to_string());
 
         let mut config = Config {
-            notification_filters: NotificationFilter::default(),
+            notification: crate::config::NotificationConfig {
+                filters: NotificationFilter::default(),
+                ..Default::default()
+            },
             ..Default::default()
         };
         // Reset notification filters to allow the test to work as expected
-        config.notification_filters.exclude_private_repos = true;
+        config.notification.filters.exclude_private_repos = true;
 
         let new_notifications = filter_new_notifications(&notifications, &state_manager, &config);
 
@@ -374,12 +388,16 @@ mod tests {
         state_manager.update_last_checked_at("2023-01-01T00:00:00Z".to_string());
 
         let mut config = Config {
-            notification_filters: NotificationFilter::default(),
+            notification: crate::config::NotificationConfig {
+                filters: NotificationFilter::default(),
+                ..Default::default()
+            },
             ..Default::default()
         };
         // Reset notification filters to allow the test to work as expected
         config
-            .notification_filters
+            .notification
+            .filters
             .title_contains
             .push("urgent".to_string()); // Case insensitive
 
@@ -482,14 +500,18 @@ mod tests {
         state_manager.update_last_checked_at("2023-01-01T00:00:00Z".to_string());
 
         let mut config = Config {
-            notification_filters: NotificationFilter::default(),
+            notification: crate::config::NotificationConfig {
+                filters: NotificationFilter::default(),
+                ..Default::default()
+            },
             ..Default::default()
         };
         // Clear include filters so all notifications are considered
-        config.notification_filters.include_reasons = vec![];
-        config.notification_filters.include_subject_types = vec![];
+        config.notification.filters.include_reasons = vec![];
+        config.notification.filters.include_subject_types = vec![];
         config
-            .notification_filters
+            .notification
+            .filters
             .include_organizations
             .push("myorg".to_string());
 
@@ -554,14 +576,18 @@ mod tests {
         state_manager.update_last_checked_at("2023-01-01T00:00:00Z".to_string());
 
         let mut config = Config {
-            notification_filters: NotificationFilter::default(),
+            notification: crate::config::NotificationConfig {
+                filters: NotificationFilter::default(),
+                ..Default::default()
+            },
             ..Default::default()
         };
         // Clear include filters so all notifications are considered
-        config.notification_filters.include_reasons = vec![];
-        config.notification_filters.include_subject_types = vec![];
+        config.notification.filters.include_reasons = vec![];
+        config.notification.filters.include_subject_types = vec![];
         config
-            .notification_filters
+            .notification
+            .filters
             .exclude_organizations
             .push("spamorg".to_string());
 
@@ -626,14 +652,18 @@ mod tests {
         state_manager.update_last_checked_at("2023-01-01T00:00:00Z".to_string());
 
         let mut config = Config {
-            notification_filters: NotificationFilter::default(),
+            notification: crate::config::NotificationConfig {
+                filters: NotificationFilter::default(),
+                ..Default::default()
+            },
             ..Default::default()
         };
         // Clear include filters so all notifications are considered
-        config.notification_filters.include_reasons = vec![];
-        config.notification_filters.include_subject_types = vec![];
+        config.notification.filters.include_reasons = vec![];
+        config.notification.filters.include_subject_types = vec![];
         config
-            .notification_filters
+            .notification
+            .filters
             .exclude_subject_types
             .push("PullRequest".to_string());
 
@@ -698,14 +728,18 @@ mod tests {
         state_manager.update_last_checked_at("2023-01-01T00:00:00Z".to_string());
 
         let mut config = Config {
-            notification_filters: NotificationFilter::default(),
+            notification: crate::config::NotificationConfig {
+                filters: NotificationFilter::default(),
+                ..Default::default()
+            },
             ..Default::default()
         };
         // Clear include filters so all notifications are considered
-        config.notification_filters.include_reasons = vec![];
-        config.notification_filters.include_subject_types = vec![];
+        config.notification.filters.include_reasons = vec![];
+        config.notification.filters.include_subject_types = vec![];
         config
-            .notification_filters
+            .notification
+            .filters
             .title_not_contains
             .push("spam".to_string());
 
@@ -770,14 +804,18 @@ mod tests {
         state_manager.update_last_checked_at("2023-01-01T00:00:00Z".to_string());
 
         let mut config = Config {
-            notification_filters: NotificationFilter::default(),
+            notification: crate::config::NotificationConfig {
+                filters: NotificationFilter::default(),
+                ..Default::default()
+            },
             ..Default::default()
         };
         // Clear include filters so all notifications are considered
-        config.notification_filters.include_reasons = vec![];
-        config.notification_filters.include_subject_types = vec![];
+        config.notification.filters.include_reasons = vec![];
+        config.notification.filters.include_subject_types = vec![];
         config
-            .notification_filters
+            .notification
+            .filters
             .repository_contains
             .push("main".to_string());
 
@@ -864,13 +902,16 @@ mod tests {
         state_manager.update_last_checked_at("2023-01-01T00:00:00Z".to_string());
 
         let mut config = Config {
-            notification_filters: NotificationFilter::default(),
+            notification: crate::config::NotificationConfig {
+                filters: NotificationFilter::default(),
+                ..Default::default()
+            },
             ..Default::default()
         };
         // For this test, we want to set specific include filters to test combination
-        config.notification_filters.include_reasons = vec!["review_requested".to_string()];
-        config.notification_filters.include_subject_types = vec!["PullRequest".to_string()];
-        config.notification_filters.title_contains = vec!["urgent".to_string()];
+        config.notification.filters.include_reasons = vec!["review_requested".to_string()];
+        config.notification.filters.include_subject_types = vec!["PullRequest".to_string()];
+        config.notification.filters.title_contains = vec!["urgent".to_string()];
 
         let new_notifications = filter_new_notifications(&notifications, &state_manager, &config);
 
@@ -955,14 +996,17 @@ mod tests {
         state_manager.update_last_checked_at("2023-01-01T00:00:00Z".to_string());
 
         let mut config = Config {
-            notification_filters: NotificationFilter::default(),
+            notification: crate::config::NotificationConfig {
+                filters: NotificationFilter::default(),
+                ..Default::default()
+            },
             ..Default::default()
         };
         // Clear include filters so all notification types are considered
-        config.notification_filters.include_reasons = vec![];
-        config.notification_filters.include_subject_types = vec![];
+        config.notification.filters.include_reasons = vec![];
+        config.notification.filters.include_subject_types = vec![];
         // Enable the draft PR exclusion filter
-        config.notification_filters.exclude_draft_prs = true;
+        config.notification.filters.exclude_draft_prs = true;
 
         let new_notifications = filter_new_notifications(&notifications, &state_manager, &config);
 

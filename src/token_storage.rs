@@ -33,8 +33,8 @@ impl TokenStorage {
 
         // Create directory if it doesn't exist
         if let Some(parent) = token_file_path.parent() {
-            fs::create_dir_all(parent).map_err(|e| {
-                AuthError::GeneralError(format!("Failed to create config directory: {}", e))
+            fs::create_dir_all(parent).map_err(|e| AuthError::Generic {
+                reason: format!("Failed to create config directory: {}", e),
             })?;
         }
 
@@ -75,11 +75,13 @@ impl TokenStorage {
     }
 
     fn save_to_file(&self, token_info: &TokenInfo) -> Result<(), AuthError> {
-        let token_json = serde_json::to_string(token_info)
-            .map_err(|e| AuthError::GeneralError(format!("Failed to serialize token: {}", e)))?;
+        let token_json = serde_json::to_string(token_info).map_err(|e| AuthError::Generic {
+            reason: format!("Failed to serialize token: {}", e),
+        })?;
 
-        fs::write(&self.token_file_path, token_json)
-            .map_err(|e| AuthError::GeneralError(format!("Failed to write token file: {}", e)))?;
+        fs::write(&self.token_file_path, token_json).map_err(|e| AuthError::Generic {
+            reason: format!("Failed to write token file: {}", e),
+        })?;
 
         tracing::info!("Token saved to file: {:?}", self.token_file_path);
         Ok(())
@@ -142,7 +144,9 @@ impl TokenStorage {
                 }
             }
             Err(keyring::Error::NoEntry) => Ok(None),
-            Err(e) => Err(AuthError::GeneralError(format!("Keyring error: {}", e))),
+            Err(e) => Err(AuthError::Generic {
+                reason: format!("Keyring error: {}", e),
+            }),
         }
     }
 
@@ -151,15 +155,19 @@ impl TokenStorage {
             return Ok(None);
         }
 
-        let token_json = fs::read_to_string(&self.token_file_path)
-            .map_err(|e| AuthError::GeneralError(format!("Failed to read token file: {}", e)))?;
+        let token_json =
+            fs::read_to_string(&self.token_file_path).map_err(|e| AuthError::Generic {
+                reason: format!("Failed to read token file: {}", e),
+            })?;
 
         if token_json.trim().is_empty() {
             return Ok(None);
         }
 
-        let token_info: TokenInfo = serde_json::from_str(&token_json)
-            .map_err(|e| AuthError::GeneralError(format!("Failed to deserialize token: {}", e)))?;
+        let token_info: TokenInfo =
+            serde_json::from_str(&token_json).map_err(|e| AuthError::Generic {
+                reason: format!("Failed to deserialize token: {}", e),
+            })?;
 
         Ok(Some(token_info))
     }
@@ -178,8 +186,8 @@ impl TokenStorage {
 
         // Delete from file as well
         if self.token_file_path.exists() {
-            fs::remove_file(&self.token_file_path).map_err(|e| {
-                AuthError::GeneralError(format!("Failed to delete token file: {}", e))
+            fs::remove_file(&self.token_file_path).map_err(|e| AuthError::Generic {
+                reason: format!("Failed to delete token file: {}", e),
             })?;
             tracing::info!("Token file deleted: {:?}", self.token_file_path);
         }

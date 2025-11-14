@@ -11,7 +11,9 @@ impl GitHubClient {
         let client = Client::builder()
             .user_agent(format!("gh-notifier/{}", env!("CARGO_PKG_VERSION")))
             .build()
-            .map_err(|e| AuthError::GeneralError(format!("Failed to create HTTP client: {}", e)))?;
+            .map_err(|e| AuthError::Generic {
+                reason: format!("Failed to create HTTP client: {}", e),
+            })?;
 
         Ok(GitHubClient {
             client,
@@ -57,24 +59,21 @@ impl GitHubClient {
             let text = response.text().await?;
             // Check if the error message contains specific indicators for token issues
             if text.contains("Bad credentials") || text.contains("Invalid token") {
-                Err(AuthError::GeneralError(format!(
-                    "Authentication token error: {} - {}",
-                    status, text
-                )))
+                Err(AuthError::Generic {
+                    reason: format!("Authentication token error: {} - {}", status, text),
+                })
             } else {
                 // For other 403 errors (like rate limits, API restrictions), don't treat as authentication error
-                Err(AuthError::GeneralError(format!(
-                    "API access error: {} - {}",
-                    status, text
-                )))
+                Err(AuthError::Generic {
+                    reason: format!("API access error: {} - {}", status, text),
+                })
             }
         } else {
             let status_code = response.status();
             let text = response.text().await?;
-            Err(AuthError::GeneralError(format!(
-                "Failed to get notifications: {} - {}",
-                status_code, text
-            )))
+            Err(AuthError::Generic {
+                reason: format!("Failed to get notifications: {} - {}", status_code, text),
+            })
         }
     }
 
@@ -103,23 +102,20 @@ impl GitHubClient {
             let text = response.text().await?;
             // Check if the error message contains specific indicators for token issues
             if text.contains("Bad credentials") || text.contains("Invalid token") {
-                Err(AuthError::GeneralError(format!(
-                    "Authentication token error: {} - {}",
-                    status, text
-                )))
+                Err(AuthError::Generic {
+                    reason: format!("Authentication token error: {} - {}", status, text),
+                })
             } else {
                 // For other 403 errors (like rate limits, API restrictions), don't treat as authentication error
-                Err(AuthError::GeneralError(format!(
-                    "API access error: {} - {}",
-                    status, text
-                )))
+                Err(AuthError::Generic {
+                    reason: format!("API access error: {} - {}", status, text),
+                })
             }
         } else {
             let text = response.text().await?;
-            Err(AuthError::GeneralError(format!(
-                "Failed to mark notification as read: {} - {}",
-                status, text
-            )))
+            Err(AuthError::Generic {
+                reason: format!("Failed to mark notification as read: {} - {}", status, text),
+            })
         }
     }
 
